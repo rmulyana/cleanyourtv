@@ -1,0 +1,13 @@
+# Extra debloat for Xiaomi MiTV-AESP0 (user choice, 2026-10-20).
+# Undo: TV_HOST=<tv ip> tools/restore.sh my-debloat-extra.txt
+# com.amazon.amazonvideo.livingroom # Prime Video: re-enabled by user 2026-10-20
+com.google.android.videos           # Google Play Movies / Google TV
+com.google.android.tv               # Live Channels (no tuner)
+com.google.android.marvin.talkback  # TalkBack
+com.android.printspooler            # Print spooler
+com.xiaomo.tv.milegal               # Mi legal info
+com.google.android.backdrop         # Ambient Mode screensaver
+com.mitv.dream                      # Mi screensaver
+com.mitv.videoplayer                # Mi video player
+# Also: com.google.android.youtube.tvmusic disabled by hand 2026-10-20 (pm disable-user); enable with pm enable.
+# Also: com.google.android.youtube.tv disabled by hand 2026-10-20 (replaced by SmartTube); enable with pm enable.

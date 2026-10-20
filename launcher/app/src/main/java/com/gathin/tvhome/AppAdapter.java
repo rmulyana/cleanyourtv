@@ -9,10 +9,12 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Outline;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.provider.Settings;
@@ -31,6 +33,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -287,6 +290,8 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
 
     private Drawable loadBanner(PackageManager pm, ResolveInfo ri) {
+        Drawable custom = themeBanner(ri.activityInfo.packageName);
+        if (custom != null) return custom;
         int id = ri.activityInfo.banner;
         if (id == 0) id = ri.activityInfo.applicationInfo.banner;
         if (id != 0) {
@@ -299,6 +304,16 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             }
         }
         return ri.activityInfo.loadBanner(pm);
+    }
+
+    /** A theme's banners/<package>.png (tools/theme.sh pushes it), drawn instead of the app's own banner. */
+    private Drawable themeBanner(String pkg) {
+        File dir = Config.dir(ctx);
+        if (dir == null) return null;
+        File file = new File(new File(dir, Config.BANNERS_DIR), pkg + ".png");
+        if (!file.isFile()) return null;
+        Bitmap bmp = BitmapFactory.decodeFile(file.getPath());
+        return bmp != null ? new BitmapDrawable(ctx.getResources(), bmp) : null;
     }
 
     @NonNull

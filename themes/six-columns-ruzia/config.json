@@ -1,0 +1,20 @@
+{
+  "columns": 5,
+  "rows_below_dock": 0,
+  "background_color": "#000000",
+  "wallpaper": false,
+  "show_stats": true,
+  "dock_band": false,
+  "greeting_name": "Ruzia",
+  "hidden_apps": [
+    "com.android.vending",
+    "com.google.android.youtube.tv"
+  ],
+  "dock_apps": [
+    "org.smarttube.stable",
+    "com.netflix.ninja",
+    "com.amazon.amazonvideo.livingroom",
+    "appnovatica.tv",
+    "com.rblive.tv"
+  ]
+}

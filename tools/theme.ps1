@@ -28,7 +28,7 @@ $revision = [guid]::NewGuid().ToString('N')
 $restart = "a=`$(settings get secure enabled_accessibility_services); am force-stop $pkg; am start -n $pkg/.MainActivity >/dev/null; case `"`$a`" in *$pkg*) sleep 1; settings put secure enabled_accessibility_services ''; settings put secure enabled_accessibility_services `"`$a`"; settings put secure accessibility_enabled 1 ;; esac"
 
 if ($Reset) {
-    & $py -I tv.py "mkdir -p $dir; rm -f $dir/config.json $dir/wallpaper.jpg; printf '%s' '$revision' > $dir/theme_revision; $restart; echo reset"
+    & $py -I tv.py "mkdir -p $dir; rm -f $dir/config.json $dir/wallpaper.jpg; rm -rf $dir/banners; printf '%s' '$revision' > $dir/theme_revision; $restart; echo reset"
     exit 0
 }
 if (-not $Theme) { throw 'usage: theme.ps1 <theme folder> | -Reset' }
@@ -40,6 +40,13 @@ try { Get-Content $config -Raw | ConvertFrom-Json | Out-Null } catch { throw "$c
 & $py -I tv.py --push $config "$dir/config.json"
 $wall = Join-Path $Theme 'wallpaper.jpg'
 if (Test-Path $wall) { & $py -I b64push.py $wall "$dir/wallpaper.jpg" } else { & $py -I tv.py "rm -f $dir/wallpaper.jpg" | Out-Null }
+# Replacement tile banners: banners\<package>.png in the theme folder. Clear the old set first.
+& $py -I tv.py "rm -rf $dir/banners" | Out-Null
+$banners = Join-Path $Theme 'banners'
+if (Test-Path $banners) {
+    & $py -I tv.py "mkdir -p $dir/banners" | Out-Null
+    Get-ChildItem -Path $banners -Filter *.png | ForEach-Object { & $py -I b64push.py $_.FullName "$dir/banners/$($_.Name)" }
+}
 & $py -I tv.py "printf '%s' '$revision' > $dir/theme_revision" | Out-Null
 & $py -I tv.py "$restart; echo applied"
 Write-Host "Theme $(Split-Path $Theme -Leaf) is on the TV. Undo with: tools\theme.ps1 -TvHost $TvHost -Reset"

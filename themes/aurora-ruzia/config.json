@@ -1,0 +1,12 @@
+{
+  "background_color": "#070A14",
+  "wallpaper": true,
+  "columns": 5,
+  "rows_below_dock": 0,
+  "show_stats": true,
+  "dock_band": false,
+  "greeting_name": "Ruzia",
+  "hidden_apps": [
+    "com.android.vending"
+  ]
+}

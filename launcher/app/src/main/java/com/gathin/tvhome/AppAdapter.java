@@ -293,6 +293,13 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     }
 
     private Drawable loadBanner(PackageManager pm, ResolveInfo ri) {
+        // A theme can replace an app's art: banners/<package>.png next to config.json (16:9, e.g. 640x360).
+        java.io.File dir = Config.dir(ctx);
+        java.io.File custom = dir == null ? null : new java.io.File(dir, "banners/" + ri.activityInfo.packageName + ".png");
+        if (custom != null && custom.isFile()) {
+            Drawable d = Drawable.createFromPath(custom.getPath());
+            if (d != null) return d;
+        }
         int id = ri.activityInfo.banner;
         if (id == 0) id = ri.activityInfo.applicationInfo.banner;
         if (id != 0) {

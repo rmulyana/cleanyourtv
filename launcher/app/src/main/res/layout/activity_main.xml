@@ -240,6 +240,165 @@
         </FrameLayout>
     </LinearLayout>
 
+    <!-- Panels between the header and the dock: prayer times, weather and system on top, the followed
+         clubs' next matches and their league positions below (config.json "schedule"; SchedulePanel).
+         Not focusable: the remote never lands here. -->
+    <LinearLayout
+        android:id="@+id/schedule"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="120dp"
+        android:paddingStart="56dp"
+        android:paddingEnd="56dp"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:id="@+id/prayerPanel"
+                style="@style/SchedulePanel"
+                android:layout_marginEnd="20dp">
+
+                <TextView
+                    android:id="@+id/prayerTitle"
+                    style="@style/ScheduleTitle" />
+
+                <LinearLayout
+                    android:id="@+id/prayerRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+                <TextView
+                    android:id="@+id/prayerCountdown"
+                    style="@style/ScheduleText"
+                    android:layout_marginTop="10dp"
+                    android:singleLine="true"
+                    android:textSize="15sp"
+                    android:fontFamily="@font/firacode_medium" />
+
+                <TextView
+                    android:id="@+id/prayerInfo"
+                    style="@style/ScheduleText"
+                    android:layout_marginTop="4dp"
+                    android:singleLine="true"
+                    android:textColor="#8CFFFFFF"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Weather and system share the second column, so the standings below line up with them. -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+
+                <LinearLayout
+                    android:id="@+id/weatherPanel"
+                    style="@style/SchedulePanel"
+                    android:layout_marginEnd="20dp">
+
+                    <TextView
+                        android:id="@+id/weatherTitle"
+                        style="@style/ScheduleTitle" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/weatherTemp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="12dp"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="30sp"
+                            android:fontFamily="@font/firacode_light"
+                            android:includeFontPadding="false" />
+
+                        <TextView
+                            android:id="@+id/weatherNow"
+                            style="@style/ScheduleText"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:maxLines="3" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/weatherHours"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal" />
+                </LinearLayout>
+
+                <!-- CPU, memory and storage: the show_stats line, moved here from under the clock. -->
+                <LinearLayout
+                    android:id="@+id/systemPanel"
+                    style="@style/SchedulePanel">
+
+                    <TextView
+                        style="@style/ScheduleTitle"
+                        android:text="Sistem" />
+
+                    <TextView
+                        android:id="@+id/systemStats"
+                        style="@style/ScheduleText"
+                        android:lineSpacingExtra="3dp"
+                        android:maxLines="6" />
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal"
+            android:baselineAligned="false">
+
+            <LinearLayout
+                android:id="@+id/footballPanel"
+                style="@style/SchedulePanel"
+                android:layout_marginEnd="20dp">
+
+                <TextView
+                    style="@style/ScheduleTitle"
+                    android:text="Jadwal bola" />
+
+                <!-- One single-line TextView per match, built in SchedulePanel, so a long name ends in … instead of wrapping. -->
+                <LinearLayout
+                    android:id="@+id/footballList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/standingsPanel"
+                style="@style/SchedulePanel">
+
+                <TextView
+                    style="@style/ScheduleTitle"
+                    android:text="Klasemen" />
+
+                <LinearLayout
+                    android:id="@+id/standingsRows"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
     <!-- The single floating glass highlight that springs between tiles. -->
     <com.gathin.tvhome.GlassView
         android:id="@+id/glass"

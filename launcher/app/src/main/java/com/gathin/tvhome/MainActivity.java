@@ -114,6 +114,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView stats;
     /** config.xml show_stats, overridable by a theme. Off: the line is gone and nothing is read. */
     private boolean showStats;
+    /** Prayer times and football panels (config.json "schedule"); null when off. */
+    private SchedulePanel schedule;
     private boolean shamsi;
     /** greeting_name: said after the greeting, which is shown in capitals. */
     private String greetingName = "";
@@ -231,6 +233,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             updateGreeting();
             updateWifiLabel();
             sky.update();
+            if (schedule != null) schedule.refresh();
             handler.postDelayed(this, MINUTE_MS);
         }
     };
@@ -277,6 +280,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         shamsiDate = findViewById(R.id.shamsiDate);
         stats = findViewById(R.id.stats);
         showStats = cfg.showStats;
+        View scheduleView = findViewById(R.id.schedule);   // absent from the Hebrew layout
+        if (cfg.schedule != null && scheduleView != null) {
+            TextView clock = findViewById(R.id.clock);
+            schedule = new SchedulePanel(scheduleView, cfg.schedule, clock.getTypeface(), greeting.getTypeface());
+        }
         shamsi = cfg.shamsiDate;
         greetingName = cfg.greetingName;
         if (shamsi) {
@@ -582,6 +590,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         updateWifiLabel();
         updateInputsButton();
         if (showStats) startStats();
+        if (schedule != null) schedule.refresh();
         sky.update();
         handler.postDelayed(minuteTick, MINUTE_MS);
         if (festive && diya != null) {
@@ -1172,7 +1181,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void startStats() {
         if (statsThread != null) return;
-        stats.setVisibility(View.VISIBLE);
+        boolean inPanel = schedule != null && schedule.systemOn;
+        stats.setVisibility(inPanel ? View.GONE : View.VISIBLE);
         cpuTotalPrev = -1;
         idlePrev = -1;
         procStatDead = false;
@@ -1187,8 +1197,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             public void run() {
                 if (statsBg != bg) return;
                 String line = readStatsLine();
+                String extras = inPanel ? SchedulePanel.systemExtras(getApplicationContext()) : "";
                 handler.post(() -> {
-                    if (showStats && stats != null && statsBg == bg) stats.setText(line);
+                    if (!showStats || stats == null || statsBg != bg) return;
+                    if (inPanel) schedule.showSystem(line, extras);
+                    else stats.setText(line);
                 });
                 if (statsBg == bg) bg.postDelayed(this, STATS_MS);
             }

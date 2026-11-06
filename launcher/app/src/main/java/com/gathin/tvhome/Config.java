@@ -78,6 +78,8 @@ final class Config {
     final File wallpaper;
     /** Whether the overlay file was present and parsed. */
     final boolean overlayApplied;
+    /** config.json "schedule" for {@link SchedulePanel}, or null: no prayer or football panels. */
+    JSONObject schedule;
     /** config.json "dock_band": false keeps the dock row but drops the lighter band behind it. */
     boolean dockBand = true;
     /** config.json "dock_lower": dp the dock row sits lower than its default place, 0 to 60. */
@@ -214,6 +216,7 @@ final class Config {
                 shamsi, greetingName, moduleCards, reducedMotion, dockTitle, dockRow, reorderButton, vpn, homeSettings, showStats, library, background,
                 Math.max(0, Math.min(100, skyIntensity)), settingsKeycodes, settingsKeyPanel, wallpaper, applied,
                 festival);
+        cfg.schedule = json == null ? null : json.optJSONObject("schedule");
         if (json != null) {
             cfg.dockBand = bool(json, "dock_band", true);
             cfg.dockLowerDp = integer(json, "dock_lower", 0, 0, 60);

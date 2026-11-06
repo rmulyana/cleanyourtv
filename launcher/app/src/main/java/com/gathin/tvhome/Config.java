@@ -78,6 +78,10 @@ final class Config {
     final File wallpaper;
     /** Whether the overlay file was present and parsed. */
     final boolean overlayApplied;
+    /** config.json "dock_band": false keeps the dock row but drops the lighter band behind it. */
+    boolean dockBand = true;
+    /** config.json "dock_lower": dp the dock row sits lower than its default place, 0 to 60. */
+    int dockLowerDp;
     /** Festive skin from a theme (festival, festival_until, greeting, accent_color); {@link Festival#NONE} if none. */
     final Festival festival;
 
@@ -205,11 +209,16 @@ final class Config {
         Festival festival = json == null ? Festival.NONE : Festival.parse(string(json, "festival", ""),
                 string(json, "festival_until", ""), string(json, "greeting", ""), string(json, "accent_color", ""));
 
-        return new Config(dock, fillDock, hidden, liveTv, liveTvAction, panelService, panelAction, inputAction,
+        Config cfg = new Config(dock, fillDock, hidden, liveTv, liveTvAction, panelService, panelAction, inputAction,
                 Math.max(1, columns), Math.max(0, rowsBelow), animations, advancedEffects,
                 shamsi, greetingName, moduleCards, reducedMotion, dockTitle, dockRow, reorderButton, vpn, homeSettings, showStats, library, background,
                 Math.max(0, Math.min(100, skyIntensity)), settingsKeycodes, settingsKeyPanel, wallpaper, applied,
                 festival);
+        if (json != null) {
+            cfg.dockBand = bool(json, "dock_band", true);
+            cfg.dockLowerDp = integer(json, "dock_lower", 0, 0, 60);
+        }
+        return cfg;
     }
 
     private static void syncThemeChoices(SharedPreferences choices, File dir, File config) {

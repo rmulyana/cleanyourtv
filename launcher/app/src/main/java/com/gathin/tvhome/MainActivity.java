@@ -575,6 +575,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onResume() {
         super.onResume();
+        AppLock.relockAll();   // back on Home: locked apps ask for the code again
+        AppLock.ensureService(this);
         // A festival that started or ended while Home was in the background: rebuild with or without it.
         if (festive != festival.active(LocalDate.now())) {
             recreate();
@@ -1884,6 +1886,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
         if (moduleCards) addSettingsMenuRow(rows, popup, R.string.module_cards, this::showModuleCards);
         addSettingsMenuRow(rows, popup, R.string.reorder, this::toggleReorder);
+        if (AppLock.hasCode(this)) addSettingsMenuRow(rows, popup, R.string.change_lock_code, () -> startActivity(
+                new Intent(this, LockActivity.class).putExtra(LockActivity.EXTRA_CHANGE, true)));
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
         popup.setWidth(Math.max((int) (200 * density), panel.getMeasuredWidth()));
         // Hebrew puts Settings at the left of the header: grow the menu inward from it.

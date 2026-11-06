@@ -8,6 +8,10 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Lets Home switch HomeKeyService (Home key, parental lock) back on after an update or force-stop
+         (AppLock.ensureService). Granted over adb: pm grant com.gathin.tvhome android.permission.WRITE_SECURE_SETTINGS -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <!-- Only for the football fixtures in SchedulePanel (config.json "schedule" teams). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -71,6 +75,16 @@
             android:excludeFromRecents="true"
             android:screenOrientation="landscape" />
         <!-- Remote Settings button panel (settings_key_panel); own task so the app behind stays put. -->
+        <!-- Parental lock screen, started by HomeKeyService over a locked app (AppLock). Its own task, never in
+             recents, so it cannot be skipped back to. -->
+        <activity
+            android:name=".LockActivity"
+            android:exported="false"
+            android:taskAffinity=""
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
         <activity
             android:name=".QuickSettingsActivity"
             android:exported="false"

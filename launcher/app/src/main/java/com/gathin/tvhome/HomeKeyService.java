@@ -7,6 +7,8 @@ import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 
 /**
+ * Also enforces the parental lock ({@link AppLock}) from the window-change events it already receives.
+ *
  * Sends the remote's Home button to this launcher on remotes that emit KEYCODE_ALL_APPS for Home
  * (Xiaomi sticks and boxes). Android TV 9 routes that key only to the system-image launcher, so once
  * the stock launcher is disabled the button does nothing. Every other key passes through untouched.
@@ -63,6 +65,13 @@ public class HomeKeyService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        // Parental lock: cover a locked app the moment its window comes up, however it was opened.
+        if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || event.getPackageName() == null) return;
+        String pkg = event.getPackageName().toString();
+        if (!AppLock.needsLock(this, pkg)) return;
+        startActivity(new Intent(this, LockActivity.class)
+                .putExtra(LockActivity.EXTRA_PACKAGE, pkg)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
     }
 
     @Override

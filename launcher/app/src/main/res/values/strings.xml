@@ -87,4 +87,6 @@
     </plurals>
     <!-- The greeting, then greeting_name: "Good morning, Mr. Trịnh". -->
     <string name="greeting_with_name">%1$s, %2$s</string>
+    <!-- Settings long-press menu: change the parental lock code (AppLock). -->
+    <string name="change_lock_code">Ganti kode kunci</string>
 </resources>

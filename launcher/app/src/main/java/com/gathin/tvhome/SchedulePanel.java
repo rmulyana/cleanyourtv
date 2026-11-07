@@ -377,17 +377,16 @@ final class SchedulePanel {
     }
 
     /** WMO weather code (Open-Meteo) in Indonesian. */
+    // One word each: the column beside the temperature fits about 10 characters per line.
     static String describe(int code) {
-        if (code == 0) return "Cerah";
-        if (code == 1) return "Cerah berawan";
+        if (code == 0 || code == 1) return "Cerah";
         if (code == 2) return "Berawan";
         if (code == 3) return "Mendung";
         if (code == 45 || code == 48) return "Berkabut";
-        if (code >= 51 && code <= 57) return "Gerimis";
-        if (code == 61 || code == 80) return "Hujan ringan";
+        if (code >= 51 && code <= 57 || code == 61 || code == 80) return "Gerimis";
         if (code == 63 || code == 81) return "Hujan";
-        if (code == 65 || code == 82 || code == 66 || code == 67) return "Hujan lebat";
-        if (code >= 95) return "Hujan badai";
+        if (code == 65 || code == 82 || code == 66 || code == 67) return "Deras";
+        if (code >= 95) return "Badai";
         return "—";
     }
 

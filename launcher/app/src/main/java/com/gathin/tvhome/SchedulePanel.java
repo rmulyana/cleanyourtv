@@ -47,6 +47,8 @@ final class SchedulePanel {
     private static final long FETCH_MS = 30 * 60 * 1000L;
     /** A match stays listed this long after kick-off. */
     private static final long LIVE_MS = 2 * 60 * 60 * 1000L;
+    /** From this long before kick-off a match's time becomes a countdown, like the next prayer. */
+    private static final long SOON_MS = 30 * 60 * 1000L;
     private static final int HOURS = 4;
     static final Locale ID = new Locale("id", "ID");
     static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE, ppd MMM", ID);   // day padded to 2 so the monospace " | " lines up
@@ -307,12 +309,25 @@ final class SchedulePanel {
         for (Match m : matches) if (m.at + LIVE_MS >= now && lines.size() < 4) lines.add(m);
         if (lines.isEmpty()) lines.add(new Match(0, waiting, "", ""));
         footballList.removeAllViews();
+        liveDots.clear();
         float d = root.getResources().getDisplayMetrics().density;
         for (Match m : lines) {
-            TextView v = text(12, footballFont, 0xE6FFFFFF);
+            String label = m.at == 0 ? null : kickoffLabel(m.at, now);
+            int slot = m.text.indexOf(" - ") + 3;   // the 5-character time after the date
+            Match shown = label == null || slot < 3 ? m
+                    : new Match(m.at, m.text.substring(0, slot) + label + m.text.substring(slot + 5), m.homeLogo, m.awayLogo);
+            TextView v = text(12, footballFont, label == null ? 0xE6FFFFFF : 0xFFFFFFFF);
             v.setEllipsize(android.text.TextUtils.TruncateAt.END);
             v.setPadding(0, (int) (2 * d), 0, (int) (5 * d));
-            v.setText(withLogos(m, d, Math.round(13 * d)));
+            android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(withLogos(shown, d, Math.round(13 * d)));
+            if (label != null && slot >= 3) {
+                boolean live = label.equals(LIVE);
+                b.setSpan(new android.text.style.ForegroundColorSpan(live ? 0xFFFF5A5A : 0xFF2E9E5B), slot, slot + 5,
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                b.setSpan(new Bold(boldFont), slot, slot + 5, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                if (live) liveDots.add(new Object[]{v, b, slot});
+            }
+            v.setText(b);
             footballList.addView(v);
         }
         if (weatherOn) showWeather(waiting);
@@ -698,8 +713,48 @@ final class SchedulePanel {
         }
     }
 
+    static final String LIVE = "\u25CFLIVE";   // "●LIVE": five characters, like the "23.30" it replaces
+
     /**
-     * The match line with each side's logo (on its grey disc) before its name, then the followed clubs in bold. The logos
+     * What a match's time slot shows: null before the last {@link #SOON_MS} (keep the time), "25m" counting down
+     * to kick-off, then {@link #LIVE} for {@link #LIVE_MS} (no live scores on the free key, so by the clock).
+     * Always five characters so the " | " stays aligned.
+     */
+    static String kickoffLabel(long kickoff, long now) {
+        if (now >= kickoff) return now < kickoff + LIVE_MS ? LIVE : null;
+        if (kickoff - now > SOON_MS) return null;
+        long minutes = Math.max(1, (kickoff - now + 59_999) / 60_000);
+        return String.format(Locale.ROOT, "%-5s", minutes + "m");
+    }
+
+    /** Live lines' blinking dots: {TextView, its text, the dot's index}. */
+    private final List<Object[]> liveDots = new ArrayList<>();
+    private final android.text.style.ForegroundColorSpan dotOff = new android.text.style.ForegroundColorSpan(0);
+
+    /** Called with the clock's colon (once a second): the "●" of a live match blinks with it. */
+    void blink(boolean on) {
+        for (Object[] l : liveDots) {
+            android.text.SpannableStringBuilder b = (android.text.SpannableStringBuilder) l[1];
+            int at = (Integer) l[2];
+            b.removeSpan(dotOff);
+            if (!on) b.setSpan(dotOff, at, at + 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            ((TextView) l[0]).setText(b);
+        }
+    }
+
+    /** The fetched matches, soonest first, for the overlay's kick-off notice. */
+    static List<Match> matches() {
+        return matches;
+    }
+
+    /** "Man Utd v Aston Villa" from a match line. */
+    static String fixture(Match m) {
+        int bar = m.text.indexOf(" | ");
+        return bar < 0 ? m.text : m.text.substring(bar + 3);
+    }
+
+    /**
+     * The match line with each side's logo before its name, then the followed clubs in bold. The logos
      * go in first: a span would swallow text inserted at its start.
      */
     private CharSequence withLogos(Match m, float d, int size) {

@@ -239,6 +239,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (colon >= 0) {
                 android.text.SpannableString s = new android.text.SpannableString(t.toString());
                 boolean shown = (System.currentTimeMillis() / 1000) % 2 == 0;
+                if (schedule != null) schedule.blink(shown);
                 if (!shown) s.setSpan(new android.text.style.ForegroundColorSpan(0), colon, colon + 1,
                         android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 clock.setText(s);

@@ -155,7 +155,13 @@ final class SchedulePanel {
                 new FixturesDialog(root.getContext(), clubs, teamColors, shortNames, footballFont, medium).show();
             });
         }
-        root.findViewById(R.id.weatherPanel).setVisibility(weatherOn ? View.VISIBLE : View.INVISIBLE);
+        View weatherPanel = root.findViewById(R.id.weatherPanel);
+        weatherPanel.setVisibility(weatherOn ? View.VISIBLE : View.INVISIBLE);
+        if (weatherOn) {
+            focusRing(weatherPanel);
+            weatherPanel.setOnClickListener(v -> new WeatherDialog(root.getContext(), lat, lon, cfg.optString("city", ""),
+                    footballFont, medium).show());
+        }
         View standingsPanel = root.findViewById(R.id.standingsPanel);
         standingsPanel.setVisibility(standingsCfg.length() > 0 ? View.VISIBLE : View.INVISIBLE);
         if (standingsCfg.length() > 0) {
@@ -428,6 +434,18 @@ final class SchedulePanel {
         } catch (Exception e) {   // outside the calendar's table range
             return "";
         }
+    }
+
+    /** An emoji for a WMO weather code; clear or partly cloudy nights get the moon. Android's emoji font draws it. */
+    static String icon(int code, boolean day) {
+        if (code == 0 || code == 1) return day ? "\u2600\uFE0F" : "\uD83C\uDF19";   // sun / crescent moon
+        if (code == 2) return day ? "\u26C5" : "\u2601\uFE0F";                            // sun behind cloud / cloud
+        if (code == 3) return "\u2601\uFE0F";                                             // cloud
+        if (code == 45 || code == 48) return "\uD83C\uDF2B\uFE0F";                        // fog
+        if (code >= 51 && code <= 57 || code == 61 || code == 80) return "\uD83C\uDF26\uFE0F";   // sun behind rain cloud
+        if (code >= 95) return "\u26C8\uFE0F";                                            // thunder cloud and rain
+        if (code >= 61 && code <= 82) return "\uD83C\uDF27\uFE0F";                        // rain cloud
+        return "";
     }
 
     /** WMO weather code (Open-Meteo) in Indonesian. */

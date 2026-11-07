@@ -37,6 +37,7 @@ import java.util.Locale;
  * <pre>"schedule": {"city": "Bandung", "lat": -6.9175, "lon": 107.6191, "elevation": 768, "hijri_adjust": -1,
  *   "weather": true, "system": true,
  *   "teams": [139356, 133612], "short_names": {"Manchester United": "Man Utd"},
+ *   "team_colors": {"Man Utd": "#7A1F2B", "Indonesia": "#F2F2F2 #B0001B"},
  *   "standings": [{"name": "Persib", "league": "Liga 1", "source": "sportsdb:4790:139356"},
  *                 {"name": "Man Utd", "league": "Premier", "source": "espn:eng.1:360"}]}</pre>
  * Teams are TheSportsDB ids. Network data is fetched off the main thread at most every 30 minutes while Home is shown.
@@ -73,6 +74,9 @@ final class SchedulePanel {
     private final JSONArray standingsCfg;
     /** config "short_names": {"Manchester United": "Man Utd"}, applied to both sides of a match. */
     private final JSONObject shortNames;
+    /** config "team_colors": {"Man Utd": "#7A1F2B"}, keyed by the shown (short) name; that side gets a badge.
+     *  An optional second colour ("#F2F2F2 #B0001B") sets the text; otherwise black or white by the background. */
+    private final JSONObject teamColors;
     private final Typeface light, medium, footballFont;
     private TextView[] prayerNames, prayerTimes, hourNames, hourTemps;
 
@@ -108,6 +112,8 @@ final class SchedulePanel {
         for (int i = 0; i < teams.length; i++) teams[i] = t.optLong(i);
         JSONObject sn = cfg.optJSONObject("short_names");
         shortNames = sn == null ? new JSONObject() : sn;
+        JSONObject tc = cfg.optJSONObject("team_colors");
+        teamColors = tc == null ? new JSONObject() : tc;
         JSONArray s = cfg.optJSONArray("standings");
         standingsCfg = s == null ? new JSONArray() : s;
         String city = cfg.optString("city", "");
@@ -240,8 +246,8 @@ final class SchedulePanel {
         for (String line : lines) {
             TextView v = text(12, footballFont, 0xE6FFFFFF);
             v.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            v.setPadding(0, 0, 0, (int) (5 * d));
-            v.setText(line);
+            v.setPadding(0, (int) (2 * d), 0, (int) (5 * d));
+            v.setText(badges(line, d));
             footballList.addView(v);
         }
         if (weatherOn) showWeather(waiting);
@@ -505,6 +511,73 @@ final class SchedulePanel {
         String home = e.optString("strHomeTeam"), away = e.optString("strAwayTeam");
         return new Match(local.toInstant().toEpochMilli(),
                 matchLine(local, shortNames.optString(home, home), shortNames.optString(away, away)));
+    }
+
+    /** The line with each side named in "team_colors" drawn as a white-on-colour badge. */
+    private CharSequence badges(String line, float d) {
+        android.text.SpannableString out = null;
+        for (java.util.Iterator<String> it = teamColors.keys(); it.hasNext(); ) {
+            String name = it.next();
+            int at = teamStart(line, name);
+            if (at < 0) continue;
+            String[] spec = teamColors.optString(name).trim().split("\\s+");
+            int c, text;
+            try {
+                c = android.graphics.Color.parseColor(spec[0]) | 0xFF000000;
+                text = spec.length > 1 ? android.graphics.Color.parseColor(spec[1]) | 0xFF000000
+                        : android.graphics.Color.luminance(c) > 0.3f ? 0xFF000000 : 0xFFFFFFFF;
+            } catch (IllegalArgumentException e) {
+                continue;
+            }
+            if (out == null) out = new android.text.SpannableString(line);
+            out.setSpan(new Badge(c, text, d), at, at + name.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return out == null ? line : out;
+    }
+
+    /** Where {@code name} starts as the home or away side of a {@link #matchLine}, or -1. */
+    static int teamStart(String line, String name) {
+        int bar = line.indexOf(" | "), vs = line.indexOf(" v ", bar + 3);
+        if (bar < 0 || vs < 0) return -1;
+        if (line.substring(bar + 3, vs).equals(name)) return bar + 3;
+        return line.substring(vs + 3).equals(name) ? vs + 3 : -1;
+    }
+
+    /** Rounded team-colour box with a thin light border and text: legible on the dark red home even for navy or maroon. */
+    private static final class Badge extends android.text.style.ReplacementSpan {
+        private final int fill, text;
+        private final float d;
+
+        Badge(int fill, int text, float d) {
+            this.fill = fill;
+            this.text = text;
+            this.d = d;
+        }
+
+        @Override
+        public int getSize(android.graphics.Paint p, CharSequence t, int start, int end, android.graphics.Paint.FontMetricsInt fm) {
+            return Math.round(p.measureText(t, start, end) + 12 * d);
+        }
+
+        @Override
+        public void draw(android.graphics.Canvas c, CharSequence t, int start, int end, float x, int top, int y, int bottom,
+                         android.graphics.Paint p) {
+            int color = p.getColor();
+            android.graphics.Paint.Style style = p.getStyle();
+            android.graphics.RectF r = new android.graphics.RectF(x + d, y + p.ascent() - d, x + p.measureText(t, start, end) + 11 * d,
+                    y + p.descent() + d);
+            p.setStyle(android.graphics.Paint.Style.FILL);
+            p.setColor(fill);
+            c.drawRoundRect(r, 4 * d, 4 * d, p);
+            p.setStyle(android.graphics.Paint.Style.STROKE);
+            p.setStrokeWidth(1.2f * d);
+            p.setColor(0x80FFFFFF);
+            c.drawRoundRect(r, 4 * d, 4 * d, p);
+            p.setStyle(style);
+            p.setColor(text);
+            c.drawText(t, start, end, x + 6 * d, y, p);
+            p.setColor(color);
+        }
     }
 
     /** "Sab, 14 Nov - 01.00 | Jordan v Indonesia", "Min,  8 Nov - 19.00 | ..." (same width either way). */

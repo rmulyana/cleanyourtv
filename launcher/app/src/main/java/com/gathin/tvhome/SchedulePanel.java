@@ -48,9 +48,9 @@ final class SchedulePanel {
     /** A match stays listed this long after kick-off. */
     private static final long LIVE_MS = 2 * 60 * 60 * 1000L;
     private static final int HOURS = 4;
-    private static final Locale ID = new Locale("id", "ID");
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE, ppd MMM", ID);   // day padded to 2 so the monospace " | " lines up
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH.mm", ID);
+    static final Locale ID = new Locale("id", "ID");
+    static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE, ppd MMM", ID);   // day padded to 2 so the monospace " | " lines up
+    static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH.mm", ID);
 
     // Static so a recreate() does not refetch.
     private static List<Match> matches = new ArrayList<>();
@@ -65,6 +65,8 @@ final class SchedulePanel {
     private final int hijriAdjust;
     private final LinearLayout standingsRows;
     private final TextView standingsUpdated;
+    /** TheSportsDB team id → its shown name, learnt from the fixtures; names the club pages behind the panel. */
+    private static final java.util.Map<Long, String> TEAM_NAMES = new java.util.concurrent.ConcurrentHashMap<>();
     /** Standings config indexes in the order the panel shows them; the full tables open in this order. */
     private Integer[] shownOrder = new Integer[0];
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -125,7 +127,29 @@ final class SchedulePanel {
         ((TextView) root.findViewById(R.id.prayerTitle)).setText("Jadwal sholat" + at);
         ((TextView) root.findViewById(R.id.weatherTitle)).setText("Cuaca" + at);
         root.findViewById(R.id.prayerPanel).setVisibility(prayerOn ? View.VISIBLE : View.INVISIBLE);
-        root.findViewById(R.id.footballPanel).setVisibility(teams.length > 0 ? View.VISIBLE : View.INVISIBLE);
+        View footballPanel = root.findViewById(R.id.footballPanel);
+        footballPanel.setVisibility(teams.length > 0 ? View.VISIBLE : View.INVISIBLE);
+        if (teams.length > 0) {
+            focusRing(footballPanel);
+            footballPanel.setOnClickListener(v -> {
+                List<FixturesDialog.Club> clubs = new ArrayList<>();
+                for (long id : teams) {
+                    String name = TEAM_NAMES.getOrDefault(id, "Klub " + (clubs.size() + 1));
+                    String source = "sportsdb::" + id, league = "";
+                    // A club whose standings come from ESPN gets its fuller ESPN schedule.
+                    for (int i = 0; i < standingsCfg.length(); i++) {
+                        JSONObject c = standingsCfg.optJSONObject(i);
+                        if (c != null && name.equals(c.optString("name")) && c.optString("source").startsWith("espn:")) {
+                            source = c.optString("source");
+                            league = c.optString("league");
+                        }
+                    }
+                    clubs.add(new FixturesDialog.Club(name, source, league));
+                }
+                new FixturesDialog(root.getContext(), clubs, teamColors, shortNames, footballFont, medium).show();
+            });
+        }
+        root.findViewById(R.id.weatherPanel).setVisibility(weatherOn ? View.VISIBLE : View.INVISIBLE);
         View standingsPanel = root.findViewById(R.id.standingsPanel);
         standingsPanel.setVisibility(standingsCfg.length() > 0 ? View.VISIBLE : View.INVISIBLE);
         if (standingsCfg.length() > 0) {
@@ -430,6 +454,11 @@ final class SchedulePanel {
                     JSONArray ev = new JSONObject(get("https://www.thesportsdb.com/api/v1/json/123/eventsnext.php?id=" + id))
                             .optJSONArray("events");
                     matchesOk = true;
+                    if (ev != null && ev.length() > 0) {
+                        JSONObject e0 = ev.getJSONObject(0);
+                        String n = String.valueOf(id).equals(e0.optString("idHomeTeam")) ? e0.optString("strHomeTeam") : e0.optString("strAwayTeam");
+                        TEAM_NAMES.put(id, names.optString(n, n));
+                    }
                     for (int i = 0; ev != null && i < ev.length(); i++) {
                         Match m = parse(ev.getJSONObject(i), names);
                         if (m != null && got.stream().noneMatch(x -> x.text.equals(m.text))) got.add(m);
@@ -580,7 +609,7 @@ final class SchedulePanel {
     }
 
     /** Rounded team-colour box with a thin light border and text: legible on the dark red home even for navy or maroon. */
-    private static final class Badge extends android.text.style.ReplacementSpan {
+    static final class Badge extends android.text.style.ReplacementSpan {
         private final int fill, text;
         private final float d;
 

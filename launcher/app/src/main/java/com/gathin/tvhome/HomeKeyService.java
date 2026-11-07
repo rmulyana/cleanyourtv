@@ -7,7 +7,8 @@ import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 
 /**
- * Also enforces the parental lock ({@link AppLock}) from the window-change events it already receives.
+ * Also enforces the parental lock ({@link AppLock}) from the window-change events it already receives, and
+ * draws the stats overlay ({@link StatsOverlay}) over other apps.
  *
  * Sends the remote's Home button to this launcher on remotes that emit KEYCODE_ALL_APPS for Home
  * (Xiaomi sticks and boxes). Android TV 9 routes that key only to the system-image launcher, so once
@@ -23,6 +24,7 @@ public class HomeKeyService extends AccessibilityService {
     private int[] settingsScancodes = new int[0];
     private int[] settingsKeycodes = new int[0];
     private boolean settingsPanel;
+    private StatsOverlay overlay;
 
     @Override
     protected void onServiceConnected() {
@@ -32,6 +34,13 @@ public class HomeKeyService extends AccessibilityService {
         Config config = Config.load(this);
         settingsKeycodes = config.settingsKeycodes;
         settingsPanel = config.settingsKeyPanel;
+        overlay = new StatsOverlay(this);
+    }
+
+    @Override
+    public void onDestroy() {
+        if (overlay != null) overlay.destroy();
+        super.onDestroy();
     }
 
     private boolean isSettingsKey(KeyEvent event) {
@@ -68,10 +77,23 @@ public class HomeKeyService extends AccessibilityService {
         // Parental lock: cover a locked app the moment its window comes up, however it was opened.
         if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || event.getPackageName() == null) return;
         String pkg = event.getPackageName().toString();
+        // Only a new activity says which app is in front; dialogs, toasts and the volume bar do not.
+        if (overlay != null && event.getClassName() != null && isActivity(pkg, event.getClassName().toString())) {
+            overlay.foreground(pkg.equals(getPackageName()));
+        }
         if (!AppLock.needsLock(this, pkg)) return;
         startActivity(new Intent(this, LockActivity.class)
                 .putExtra(LockActivity.EXTRA_PACKAGE, pkg)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
+    }
+
+    private boolean isActivity(String pkg, String cls) {
+        try {
+            getPackageManager().getActivityInfo(new android.content.ComponentName(pkg, cls), 0);
+            return true;
+        } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+            return false;
+        }
     }
 
     @Override

@@ -1836,6 +1836,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 new Intent(this, LauncherSettingsActivity.class), LAUNCHER_SETTINGS_REQUEST));
         if (moduleCards) addSettingsMenuRow(rows, popup, R.string.module_cards, this::showModuleCards);
         addSettingsMenuRow(rows, popup, R.string.reorder, this::toggleReorder);
+        boolean overlayOn = StatsOverlay.isEnabled(this);
+        addSettingsMenuRow(rows, popup, overlayOn ? "Overlay: Aktif" : "Overlay: Mati", () -> {
+            StatsOverlay.setEnabled(this, !overlayOn);
+            Toast.makeText(this, overlayOn ? "Overlay dimatikan" : "Overlay aktif di semua aplikasi", Toast.LENGTH_SHORT).show();
+        });
         if (AppLock.hasCode(this)) addSettingsMenuRow(rows, popup, R.string.change_lock_code, () -> startActivity(
                 new Intent(this, LockActivity.class).putExtra(LockActivity.EXTRA_CHANGE, true)));
         panel.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
@@ -1847,6 +1852,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     private void addSettingsMenuRow(LinearLayout rows, PopupWindow popup, int title, Runnable action) {
+        addSettingsMenuRow(rows, popup, getString(title), action);
+    }
+
+    private void addSettingsMenuRow(LinearLayout rows, PopupWindow popup, CharSequence title, Runnable action) {
         View row = getLayoutInflater().inflate(R.layout.item_input, rows, false);
         row.findViewById(R.id.icon).setVisibility(View.GONE);
         row.findViewById(R.id.dot).setVisibility(View.GONE);

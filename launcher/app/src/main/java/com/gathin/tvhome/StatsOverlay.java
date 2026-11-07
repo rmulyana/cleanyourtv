@@ -133,6 +133,7 @@ final class StatsOverlay {
         view.setTextColor(0xF2FFFFFF);
         view.setIncludeFontPadding(false);
         view.setMaxLines(2);   // the stats, and for 15 s a kick-off notice under them
+        view.setHorizontallyScrolling(true);   // never wrap a line: the window grows to the longest one
         view.setPadding(Math.round(8 * d), Math.round(4 * d), Math.round(8 * d), Math.round(4 * d));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0x80000000);
@@ -175,11 +176,11 @@ final class StatsOverlay {
         StringBuilder s = new StringBuilder(CLOCK.format(LocalTime.now()));
         int c = cpu.sample();
         if (c >= 0) lastCpu = c;
-        if (lastCpu >= 0) s.append(" · CPU ").append(lastCpu).append('%');
+        if (lastCpu >= 0) s.append(String.format(Locale.ROOT, " · CPU %3d%%", lastCpu));
         ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
         ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
         am.getMemoryInfo(mi);
-        s.append(" · RAM ").append(mi.availMem / 1048576).append(" MB");
+        s.append(String.format(Locale.ROOT, " · RAM %4d MB", mi.availMem / 1048576));
         long rx = TrafficStats.getTotalRxBytes(), tx = TrafficStats.getTotalTxBytes(), now = System.currentTimeMillis();
         if (rx >= 0 && tx >= 0) {
             if (rxPrev >= 0 && now > atPrev) {
@@ -194,9 +195,13 @@ final class StatsOverlay {
         return n.isEmpty() ? s.toString() : s + "\n" + n;
     }
 
-    /** "120 KB/s", "3.2 MB/s". */
+    /**
+     * " 120 KB/s", " 3.2 MB/s": the number padded to four places, so the line keeps its width as speeds change
+     * (Fira Code is monospace) and the overlay does not jump or wrap.
+     */
     static String speed(double bytesPerSecond) {
         double kb = Math.max(0, bytesPerSecond) / 1024;
-        return kb < 1024 ? Math.round(kb) + " KB/s" : String.format(Locale.ROOT, "%.1f MB/s", kb / 1024);
+        return kb < 1023.5 ? String.format(Locale.ROOT, "%4d KB/s", Math.round(kb))
+                : String.format(Locale.ROOT, "%4.1f MB/s", kb / 1024);
     }
 }

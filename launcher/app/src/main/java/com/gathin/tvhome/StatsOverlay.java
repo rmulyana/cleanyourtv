@@ -32,6 +32,7 @@ final class StatsOverlay {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final CpuMeter cpu = new CpuMeter();
     private TextView view;
+    private WindowManager.LayoutParams lp;
     private boolean onHome = true;
     private long rxPrev = -1, txPrev = -1, atPrev;
     private int lastCpu = -1;
@@ -47,10 +48,30 @@ final class StatsOverlay {
         @Override
         public void run() {
             if (view == null) return;
-            view.setText(line());
+            setLine(line());
             main.postDelayed(this, 1000);
         }
     };
+
+    /**
+     * Shows the text in a window exactly as wide as its longest line. Android lays out a wrap-content window at
+     * no more than its preferred dialog width (640 px here) and lets text wrap or clip inside that, so the
+     * width is set by hand whenever it changes.
+     */
+    private void setLine(String text) {
+        view.setText(text);
+        float widest = 0;
+        for (String l : text.split("\n")) widest = Math.max(widest, view.getPaint().measureText(l));
+        int width = (int) Math.ceil(widest) + view.getPaddingLeft() + view.getPaddingRight() + 2;
+        if (width != lp.width) {
+            lp.width = width;
+            try {
+                wm.updateViewLayout(view, lp);
+            } catch (RuntimeException ignored) {
+                // the service is going away
+            }
+        }
+    }
 
     /**
      * For 15 s from a followed club's kick-off, "⚽ Man Utd v Aston Villa dimulai", or from a prayer time,
@@ -133,13 +154,12 @@ final class StatsOverlay {
         view.setTextColor(0xF2FFFFFF);
         view.setIncludeFontPadding(false);
         view.setMaxLines(2);   // the stats, and for 15 s a kick-off notice under them
-        view.setHorizontallyScrolling(true);   // never wrap a line: the window grows to the longest one
         view.setPadding(Math.round(8 * d), Math.round(4 * d), Math.round(8 * d), Math.round(4 * d));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0x80000000);
         bg.setCornerRadius(8 * d);
         view.setBackground(bg);
-        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+        lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
@@ -151,7 +171,11 @@ final class StatsOverlay {
         cpu.reset();
         rxPrev = -1;
         checkedTo = System.currentTimeMillis();
-        view.setText(line());
+        String first = line();
+        view.setText(first);
+        float widest = 0;
+        for (String l : first.split("\n")) widest = Math.max(widest, view.getPaint().measureText(l));
+        lp.width = (int) Math.ceil(widest) + view.getPaddingLeft() + view.getPaddingRight() + 2;
         try {
             wm.addView(view, lp);
         } catch (RuntimeException e) {   // the service is going away
@@ -176,7 +200,8 @@ final class StatsOverlay {
         StringBuilder s = new StringBuilder(CLOCK.format(LocalTime.now()));
         int c = cpu.sample();
         if (c >= 0) lastCpu = c;
-        if (lastCpu >= 0) s.append(String.format(Locale.ROOT, " · CPU %3d%%", lastCpu));
+        // Every field is there from the first second, a dash until it has a value, so the line never lengthens.
+        s.append(lastCpu >= 0 ? String.format(Locale.ROOT, " · CPU %3d%%", lastCpu) : " · CPU   -%");
         ActivityManager am = (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
         ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo();
         am.getMemoryInfo(mi);
@@ -186,6 +211,8 @@ final class StatsOverlay {
             if (rxPrev >= 0 && now > atPrev) {
                 double secs = (now - atPrev) / 1000.0;
                 s.append(" · ↓ ").append(speed((rx - rxPrev) / secs)).append(" ↑ ").append(speed((tx - txPrev) / secs));
+            } else {
+                s.append(" · ↓    - KB/s ↑    - KB/s");
             }
             rxPrev = rx;
             txPrev = tx;

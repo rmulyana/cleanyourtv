@@ -65,6 +65,8 @@ final class SchedulePanel {
     private final int hijriAdjust;
     private final LinearLayout standingsRows;
     private final TextView standingsUpdated;
+    /** Standings config indexes in the order the panel shows them; the full tables open in this order. */
+    private Integer[] shownOrder = new Integer[0];
     private final Handler main = new Handler(Looper.getMainLooper());
     private final double lat, lon, elevation;
     private final boolean prayerOn, weatherOn;
@@ -124,8 +126,17 @@ final class SchedulePanel {
         ((TextView) root.findViewById(R.id.weatherTitle)).setText("Cuaca" + at);
         root.findViewById(R.id.prayerPanel).setVisibility(prayerOn ? View.VISIBLE : View.INVISIBLE);
         root.findViewById(R.id.footballPanel).setVisibility(teams.length > 0 ? View.VISIBLE : View.INVISIBLE);
-        root.findViewById(R.id.weatherPanel).setVisibility(weatherOn ? View.VISIBLE : View.INVISIBLE);
-        root.findViewById(R.id.standingsPanel).setVisibility(standingsCfg.length() > 0 ? View.VISIBLE : View.INVISIBLE);
+        View standingsPanel = root.findViewById(R.id.standingsPanel);
+        standingsPanel.setVisibility(standingsCfg.length() > 0 ? View.VISIBLE : View.INVISIBLE);
+        if (standingsCfg.length() > 0) {
+            // Focusable from the remote (Up from the dock); OK opens the full tables.
+            focusRing(standingsPanel);
+            standingsPanel.setOnClickListener(v -> {
+                List<JSONObject> clubs = new ArrayList<>();
+                for (int i : shownOrder) clubs.add(standingsCfg.optJSONObject(i));
+                new StandingsDialog(root.getContext(), clubs, teamColors, footballFont, medium).show();
+            });
+        }
         systemOn = cfg.optBoolean("system", false);
         systemStats = root.findViewById(R.id.systemStats);
         root.findViewById(R.id.systemPanel).setVisibility(systemOn ? View.VISIBLE : View.INVISIBLE);
@@ -312,6 +323,7 @@ final class SchedulePanel {
             names[i] = c == null ? "" : c.optString("name");
         }
         Integer[] order = order(names, standings);
+        shownOrder = order;
         for (int pos = 0; pos < n; pos++) {
             int i = order[pos];
             JSONObject c = standingsCfg.optJSONObject(i);
@@ -526,19 +538,37 @@ final class SchedulePanel {
             String name = it.next();
             int at = teamStart(line, name);
             if (at < 0) continue;
-            String[] spec = teamColors.optString(name).trim().split("\\s+");
-            int c, text;
-            try {
-                c = android.graphics.Color.parseColor(spec[0]) | 0xFF000000;
-                text = spec.length > 1 ? android.graphics.Color.parseColor(spec[1]) | 0xFF000000
-                        : android.graphics.Color.luminance(c) > 0.3f ? 0xFF000000 : 0xFFFFFFFF;
-            } catch (IllegalArgumentException e) {
-                continue;
-            }
+            int[] colors = teamColor(teamColors, name);
+            if (colors == null) continue;
             if (out == null) out = new android.text.SpannableString(line);
-            out.setSpan(new Badge(c, text, d), at, at + name.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            out.setSpan(new Badge(colors[0], colors[1], d), at, at + name.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         return out == null ? line : out;
+    }
+
+    /** Makes a panel focusable from the remote, outlined while focused; OK then runs its click listener. */
+    private void focusRing(View panel) {
+        float d = root.getResources().getDisplayMetrics().density;
+        android.graphics.drawable.GradientDrawable ring = new android.graphics.drawable.GradientDrawable();
+        ring.setCornerRadius(18 * d);
+        ring.setStroke((int) (2 * d), 0xE6FFFFFF);
+        panel.setFocusable(true);
+        panel.setOnFocusChangeListener((v, focused) -> v.setForeground(focused ? ring : null));
+    }
+
+    /** {background, text} for a club in "team_colors" ("#bg" or "#bg #text"), or null when absent or malformed. */
+    static int[] teamColor(JSONObject teamColors, String name) {
+        String v = teamColors.optString(name).trim();
+        if (v.isEmpty()) return null;
+        String[] spec = v.split("\\s+");
+        try {
+            int c = android.graphics.Color.parseColor(spec[0]) | 0xFF000000;
+            int text = spec.length > 1 ? android.graphics.Color.parseColor(spec[1]) | 0xFF000000
+                    : android.graphics.Color.luminance(c) > 0.3f ? 0xFF000000 : 0xFFFFFFFF;
+            return new int[]{c, text};
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     /** Where {@code name} starts as the home or away side of a {@link #matchLine}, or -1. */
@@ -591,7 +621,7 @@ final class SchedulePanel {
         return DAY.format(local).replace(".", "") + " - " + TIME.format(local) + " | " + home + " v " + away;
     }
 
-    private static String get(String url) throws Exception {
+    static String get(String url) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(8000);
         c.setReadTimeout(8000);

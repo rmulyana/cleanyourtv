@@ -126,7 +126,13 @@ final class SchedulePanel {
         String at = city.isEmpty() ? "" : " · " + city;
         ((TextView) root.findViewById(R.id.prayerTitle)).setText("Jadwal sholat" + at);
         ((TextView) root.findViewById(R.id.weatherTitle)).setText("Cuaca" + at);
-        root.findViewById(R.id.prayerPanel).setVisibility(prayerOn ? View.VISIBLE : View.INVISIBLE);
+        View prayerPanel = root.findViewById(R.id.prayerPanel);
+        prayerPanel.setVisibility(prayerOn ? View.VISIBLE : View.INVISIBLE);
+        if (prayerOn) {
+            focusRing(prayerPanel);
+            prayerPanel.setOnClickListener(v -> new PrayerDialog(root.getContext(), lat, lon, elevation, hijriAdjust,
+                    cfg.optString("city", ""), footballFont, medium).show());
+        }
         View footballPanel = root.findViewById(R.id.footballPanel);
         footballPanel.setVisibility(teams.length > 0 ? View.VISIBLE : View.INVISIBLE);
         if (teams.length > 0) {

@@ -57,6 +57,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         void onLibraryFocused();
         void onLibraryBlurred();
         void onLibraryUp();
+        void onSaverRequested();
     }
 
     static final class Entry {
@@ -322,16 +323,23 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             View row = LayoutInflater.from(ctx).inflate(R.layout.row_app_library, parent, false);
             View button = row.findViewById(R.id.btnLibrary);
             button.setOnClickListener(v -> listener.onLibraryRequested());
-            button.setOnFocusChangeListener((v, focused) -> {
-                if (focused) listener.onLibraryFocused();
-                else listener.onLibraryBlurred();
-            });
-            button.setOnKeyListener((v, key, event) -> {
-                if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
-                if (key == KeyEvent.KEYCODE_DPAD_UP) listener.onLibraryUp();
-                return key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN
-                        || key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT;
-            });
+            View saver = row.findViewById(R.id.btnSaver);
+            saver.setOnClickListener(v -> listener.onSaverRequested());
+            for (View b : new View[]{button, saver}) {
+                // Either pill hides the tiles while it has focus; moving between them keeps them hidden.
+                b.setOnFocusChangeListener((v, focused) -> {
+                    if (focused) listener.onLibraryFocused();
+                    else if (!button.hasFocus() && !saver.hasFocus()) listener.onLibraryBlurred();
+                });
+                b.setOnKeyListener((v, key, event) -> {
+                    if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
+                    if (key == KeyEvent.KEYCODE_DPAD_UP) listener.onLibraryUp();
+                    if (key == KeyEvent.KEYCODE_DPAD_RIGHT && v == button) saver.requestFocus();
+                    if (key == KeyEvent.KEYCODE_DPAD_LEFT && v == saver) button.requestFocus();
+                    return key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN
+                            || key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT;
+                });
+            }
             return new RecyclerView.ViewHolder(row) { };
         }
         View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_app, parent, false);

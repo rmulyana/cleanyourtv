@@ -121,6 +121,12 @@
                 android:resource="@xml/home_key_service" />
         </service>
 
+        <!-- Home's Screensaver button: the screensaver face at once, with ambient sound. -->
+        <activity
+            android:name=".ScreensaverActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
         <!-- Screensaver: pick it in Settings, or `settings put secure screensaver_components
              com.gathin.tvhome/.ClockDream` over adb. -->
         <service

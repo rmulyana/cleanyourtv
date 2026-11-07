@@ -1337,6 +1337,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         fadeTiles(0f);   // the grid scrolls up to reach the pill; hidden tiles do not pile over the home panels
     }
 
+    @Override public void onSaverRequested() {
+        startActivity(new Intent(this, ScreensaverActivity.class));
+    }
+
     @Override public void onLibraryBlurred() {
         fadeTiles(1f);
     }

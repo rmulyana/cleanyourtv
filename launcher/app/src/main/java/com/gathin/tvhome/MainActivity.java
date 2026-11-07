@@ -1401,6 +1401,21 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         libraryFocusPending = false;
         hideGlass();
         hideHero();
+        fadeTiles(0f);   // the grid scrolls up to reach the pill; hidden tiles do not pile over the home panels
+    }
+
+    @Override public void onLibraryBlurred() {
+        fadeTiles(1f);
+    }
+
+    /** Sets every app tile (not the library pill) to {@code alpha} at once, without a fade. */
+    private void fadeTiles(float alpha) {
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View child = grid.getChildAt(i);
+            if (adapter.isLibraryAt(grid.getChildAdapterPosition(child))) continue;
+            child.animate().cancel();
+            child.setAlpha(alpha);
+        }
     }
 
     @Override public void onLibraryUp() {

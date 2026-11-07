@@ -55,6 +55,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
         void onLibraryRequested();
         void onLibraryFocused();
+        void onLibraryBlurred();
         void onLibraryUp();
     }
 
@@ -321,7 +322,10 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             View row = LayoutInflater.from(ctx).inflate(R.layout.row_app_library, parent, false);
             View button = row.findViewById(R.id.btnLibrary);
             button.setOnClickListener(v -> listener.onLibraryRequested());
-            button.setOnFocusChangeListener((v, focused) -> { if (focused) listener.onLibraryFocused(); });
+            button.setOnFocusChangeListener((v, focused) -> {
+                if (focused) listener.onLibraryFocused();
+                else listener.onLibraryBlurred();
+            });
             button.setOnKeyListener((v, key, event) -> {
                 if (event.getAction() != KeyEvent.ACTION_DOWN) return false;
                 if (key == KeyEvent.KEYCODE_DPAD_UP) listener.onLibraryUp();

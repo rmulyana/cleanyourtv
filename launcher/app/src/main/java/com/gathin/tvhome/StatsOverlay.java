@@ -18,7 +18,8 @@ import java.util.Locale;
 
 /**
  * One line in the top-left corner over every app, fullscreen video included: "21.47 · CPU 18% · RAM 412 MB ·
- * ↓ 3.2 MB/s ↑ 120 KB/s", refreshed every second. Drawn by {@link HomeKeyService} as an accessibility
+ * ↓ 3.2 MB/s ↑ 120 KB/s", refreshed every second, with a 15 s notice under it at a followed club's kick-off and
+ * at each prayer time. Drawn by {@link HomeKeyService} as an accessibility
  * overlay, so it needs no extra permission; hidden on Home, which shows the same figures. Switched on or off
  * from the Settings button's menu on Home ({@link #setEnabled}).
  */
@@ -34,6 +35,13 @@ final class StatsOverlay {
     private boolean onHome = true;
     private long rxPrev = -1, txPrev = -1, atPrev;
     private int lastCpu = -1;
+    private static final long NOTICE_MS = 15_000;
+    private long checkedTo;            // kick-offs and prayer times up to here are announced (or were before we looked)
+    private final double lat, lon, elevation;   // config "schedule"; NaN: no prayer notices
+    private java.time.LocalDate prayerDay;
+    private int[] prayerMin;
+    private String notice = "";
+    private long noticeUntil;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -44,6 +52,35 @@ final class StatsOverlay {
         }
     };
 
+    /**
+     * For 15 s from a followed club's kick-off, "⚽ Man Utd v Aston Villa dimulai", or from a prayer time,
+     * "Waktunya sholat Isya"; else "".
+     */
+    private String notice(long now) {
+        for (SchedulePanel.Match m : SchedulePanel.matches()) {
+            if (m.at > checkedTo && m.at <= now) announce("\u26BD " + SchedulePanel.fixture(m) + " dimulai", now);
+        }
+        if (!Double.isNaN(lat)) {
+            java.time.ZonedDateTime today = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault());
+            if (!today.toLocalDate().equals(prayerDay)) {
+                prayerDay = today.toLocalDate();
+                prayerMin = Prayer.minutes(prayerDay, lat, lon, elevation, today.getOffset().getTotalSeconds() / 3600.0);
+            }
+            long midnight = today.toInstant().toEpochMilli();
+            for (int i = 0; i < Prayer.NAMES.length; i++) {
+                long at = midnight + prayerMin[i] * 60_000L;
+                if (at > checkedTo && at <= now) announce("Waktunya sholat " + Prayer.NAMES[i], now);
+            }
+        }
+        checkedTo = now;
+        return now < noticeUntil ? notice : "";
+    }
+
+    private void announce(String text, long now) {
+        notice = text;
+        noticeUntil = now + NOTICE_MS;
+    }
+
     private final SharedPreferences.OnSharedPreferenceChangeListener onToggle = (p, key) -> {
         if (KEY_ON.equals(key)) update();
     };
@@ -53,6 +90,10 @@ final class StatsOverlay {
         this.ctx = ctx;
         wm = (WindowManager) ctx.getSystemService(Context.WINDOW_SERVICE);
         prefs(ctx).registerOnSharedPreferenceChangeListener(onToggle);
+        org.json.JSONObject sched = Config.load(ctx).schedule;   // the home panel's city, for prayer-time notices
+        lat = sched == null ? Double.NaN : sched.optDouble("lat", Double.NaN);
+        lon = sched == null ? Double.NaN : sched.optDouble("lon", Double.NaN);
+        elevation = sched == null ? 0 : sched.optDouble("elevation", 0);
     }
 
     static boolean isEnabled(Context ctx) {
@@ -91,7 +132,7 @@ final class StatsOverlay {
         view.setTypeface(ctx.getResources().getFont(R.font.firacode_regular));
         view.setTextColor(0xF2FFFFFF);
         view.setIncludeFontPadding(false);
-        view.setSingleLine(true);
+        view.setMaxLines(2);   // the stats, and for 15 s a kick-off notice under them
         view.setPadding(Math.round(8 * d), Math.round(4 * d), Math.round(8 * d), Math.round(4 * d));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0x80000000);
@@ -108,6 +149,7 @@ final class StatsOverlay {
         lp.y = Math.round(4 * d);
         cpu.reset();
         rxPrev = -1;
+        checkedTo = System.currentTimeMillis();
         view.setText(line());
         try {
             wm.addView(view, lp);
@@ -148,7 +190,8 @@ final class StatsOverlay {
             txPrev = tx;
             atPrev = now;
         }
-        return s.toString();
+        String n = notice(now);
+        return n.isEmpty() ? s.toString() : s + "\n" + n;
     }
 
     /** "120 KB/s", "3.2 MB/s". */

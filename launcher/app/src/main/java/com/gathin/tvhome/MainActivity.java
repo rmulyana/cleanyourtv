@@ -103,6 +103,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private View ambient;
     private TextView heroName;
     private int ambientColor = -1;
+    /** config "ambient_color", or 0 to follow the focused app. */
+    private int fixedAmbient;
     private ValueAnimator ambientAnimator;
     private boolean heroShown;
     private boolean animations;
@@ -245,6 +247,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         density = getResources().getDisplayMetrics().density;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).
         Config cfg = Config.load(this);
+        fixedAmbient = cfg.ambientColor;
         settingsKeycodes = cfg.settingsKeycodes;
         settingsKeyPanel = cfg.settingsKeyPanel;
         COLUMNS = cfg.columns;
@@ -1014,7 +1017,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     private void showHero(int position, float dockTopInRoot) {
         String label = adapter.labelAt(position);
-        int color = adapter.ambientColorAt(position);
+        int color = fixedAmbient != 0 ? fixedAmbient : adapter.ambientColorAt(position);
         float y = dockTopInRoot - 14 * density - 26 * density - heroName.getHeight();
         boolean changed = !label.contentEquals(heroName.getText());
 
@@ -1129,7 +1132,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * show (every tile has its name underneath).
      */
     private void showGlowOnly(int position) {
-        int color = adapter.ambientColorAt(position);
+        int color = fixedAmbient != 0 ? fixedAmbient : adapter.ambientColorAt(position);
         stopAmbientAnimation();
         heroName.animate().cancel();
         ambient.animate().cancel();

@@ -84,6 +84,8 @@ final class Config {
     boolean dockBand = true;
     /** config.json "dock_lower": dp the dock row sits lower than its default place, 0 to 60. */
     int dockLowerDp;
+    /** config.json "ambient_color": one fixed colour for the home glow instead of the focused app's; 0 = per app. */
+    int ambientColor;
     /** Festive skin from a theme (festival, festival_until, greeting, accent_color); {@link Festival#NONE} if none. */
     final Festival festival;
 
@@ -220,6 +222,7 @@ final class Config {
         if (json != null) {
             cfg.dockBand = bool(json, "dock_band", true);
             cfg.dockLowerDp = integer(json, "dock_lower", 0, 0, 60);
+            cfg.ambientColor = color(json, "ambient_color", 0);
         }
         return cfg;
     }

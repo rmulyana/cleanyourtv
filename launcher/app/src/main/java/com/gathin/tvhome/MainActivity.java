@@ -229,6 +229,24 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             if (appLibrary != null) appLibrary.refresh();
         }
     };
+    /** Blinks the clock's colon once a second: shown on even seconds, hidden (still taking its width) on odd. */
+    private final Runnable colonBlink = new Runnable() {
+        @Override
+        public void run() {
+            TextView clock = findViewById(R.id.clock);
+            CharSequence t = clock.getText();
+            int colon = t.toString().indexOf(':');
+            if (colon >= 0) {
+                android.text.SpannableString s = new android.text.SpannableString(t.toString());
+                boolean shown = (System.currentTimeMillis() / 1000) % 2 == 0;
+                if (!shown) s.setSpan(new android.text.style.ForegroundColorSpan(0), colon, colon + 1,
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                clock.setText(s);
+            }
+            handler.postDelayed(this, 1000 - System.currentTimeMillis() % 1000);   // on the second
+        }
+    };
+
     private final Runnable minuteTick = new Runnable() {
         @Override
         public void run() {
@@ -598,6 +616,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (schedule != null) schedule.refresh();
         sky.update();
         handler.postDelayed(minuteTick, MINUTE_MS);
+        handler.removeCallbacks(colonBlink);
+        handler.post(colonBlink);
         if (festive && diya != null) {
             diya.start();
             LocalDate today = LocalDate.now();
@@ -693,6 +713,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroName.animate().cancel();
         ambient.animate().cancel();
         handler.removeCallbacks(minuteTick);
+        handler.removeCallbacks(colonBlink);
         stopStats();
         if (diya != null) diya.stop();
         cancelPendingFocusScroll();

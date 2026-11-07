@@ -181,7 +181,12 @@ final class SchedulePanel {
         }
         systemOn = cfg.optBoolean("system", false);
         systemStats = root.findViewById(R.id.systemStats);
-        root.findViewById(R.id.systemPanel).setVisibility(systemOn ? View.VISIBLE : View.INVISIBLE);
+        View systemPanel = root.findViewById(R.id.systemPanel);
+        systemPanel.setVisibility(systemOn ? View.VISIBLE : View.INVISIBLE);
+        if (systemOn) {
+            focusRing(systemPanel);
+            systemPanel.setOnClickListener(v -> new SystemDialog(root.getContext(), lastCpu, footballFont, medium).show());
+        }
         root.setVisibility(prayerOn || teams.length > 0 || standingsCfg.length() > 0 ? View.VISIBLE : View.GONE);
         if (prayerOn) {
             prayerNames = new TextView[Prayer.NAMES.length];
@@ -197,7 +202,12 @@ final class SchedulePanel {
     }
 
     /** The stats line ("CPU 8%  ·  Memory 430 MB free  ·  ...") as one reading per line, then {@link #systemExtras}. */
+    /** The CPU figure of the last stats line, e.g. "18%", for the system window; "" when Android hides it. */
+    private String lastCpu = "";
+
     void showSystem(String statsLine, String extras) {
+        java.util.regex.Matcher cpu = java.util.regex.Pattern.compile("CPU (\\d+%)").matcher(statsLine);
+        lastCpu = cpu.find() ? cpu.group(1) : "";
         String text = statsLine.replace("  ·  ", "\n");
         systemStats.setText(extras.isEmpty() ? text : text + "\n" + extras);
     }

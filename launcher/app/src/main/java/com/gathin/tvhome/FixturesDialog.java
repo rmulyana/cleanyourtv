@@ -60,6 +60,7 @@ final class FixturesDialog {
         final long at;
         final String comp, home, away, homeScore, awayScore;
         final char result;   // W/D/L for the followed club, 0 when not played
+        String homeLogo = "", awayLogo = "";
 
         Game(long at, String comp, String home, String away, String homeScore, String awayScore, char result) {
             this.at = at;
@@ -211,10 +212,10 @@ final class FixturesDialog {
         String when = SchedulePanel.DAY.format(at).replace(".", "") + (g.result == 0 ? " - " + SchedulePanel.TIME.format(at) : "");
         add(row, text(12, regular, 0xE6FFFFFF), when, 3.9f, Gravity.START);
         add(row, text(12, regular, 0x8CFFFFFF), g.comp, 2.6f, Gravity.START);
-        team(row, g.home, mine, Gravity.END);
+        team(row, g.home, g.homeLogo, mine, Gravity.END);
         String mid = g.result == 0 ? "v" : g.homeScore + " - " + g.awayScore;
         add(row, text(12, g.result == 0 ? regular : medium, 0xFFFFFFFF), mid, 1.4f, Gravity.CENTER);
-        team(row, g.away, mine, Gravity.START);
+        team(row, g.away, g.awayLogo, mine, Gravity.START);
         TextView chip = text(10, medium, 0xFFFFFFFF);
         if (g.result != 0) {
             chip.setText(String.valueOf(g.result));
@@ -231,24 +232,18 @@ final class FixturesDialog {
     }
 
     /**
-     * A team column; the followed club gets its team-colour badge, like the home panel. A view with its own
-     * background rather than the panel's span: a span over the whole text of an ellipsizing view is not drawn.
+     * A team column with the club's logo; the followed club's name is bold, like the home panel.
      */
-    private void team(LinearLayout row, String name, String mine, int gravity) {
+    private void team(LinearLayout row, String name, String logo, String mine, int gravity) {
         LinearLayout cell = new LinearLayout(ctx);
         cell.setGravity(gravity | Gravity.CENTER_VERTICAL);
         TextView v = text(12, regular, 0xE6FFFFFF);
         v.setText(name);
-        int[] c = name.equals(mine) ? SchedulePanel.teamColor(teamColors, name) : null;
-        if (c != null) {
-            GradientDrawable bg = new GradientDrawable();
-            bg.setColor(c[0]);
-            bg.setStroke(Math.round(1.2f * d), 0x80FFFFFF);
-            bg.setCornerRadius(px(4));
-            v.setBackground(bg);
-            v.setTextColor(c[1]);
-            v.setPadding(px(6), px(2), px(6), px(2));
+        if (name.equals(mine)) {
+            v.setTypeface(ctx.getResources().getFont(R.font.firacode_bold));
+            v.setTextColor(0xFFFFFFFF);
         }
+        Logos.into(v, logo, px(15));
         cell.addView(v, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         row.addView(cell, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 3f));
     }
@@ -286,8 +281,18 @@ final class FixturesDialog {
             espn(new JSONObject(SchedulePanel.get(base + "?fixture=true")), p[2], club.league, shortNames, next);
         } else {
             String api = "https://www.thesportsdb.com/api/v1/json/123/";
-            sportsDb(new JSONObject(SchedulePanel.get(api + "eventslast.php?id=" + p[2])).optJSONArray("results"), p[2], shortNames, played);
-            sportsDb(new JSONObject(SchedulePanel.get(api + "eventsnext.php?id=" + p[2])).optJSONArray("events"), p[2], shortNames, next);
+            // Each list on its own: one failed request (TheSportsDB's free key is rate limited) leaves the other.
+            Exception failed = null;
+            try {
+                sportsDb(new JSONObject(SchedulePanel.get(api + "eventslast.php?id=" + p[2])).optJSONArray("results"), p[2], shortNames, played);
+            } catch (Exception e) {
+                failed = e;
+            }
+            try {
+                sportsDb(new JSONObject(SchedulePanel.get(api + "eventsnext.php?id=" + p[2])).optJSONArray("events"), p[2], shortNames, next);
+            } catch (Exception e) {
+                if (failed != null) throw e;
+            }
         }
         played.removeIf(g -> g.result == 0);
         next.removeIf(g -> g.result != 0);
@@ -315,15 +320,18 @@ final class FixturesDialog {
             }
             // "2026-11-08T16:30Z" has no seconds, which Instant.parse rejects on Android 9; this parser makes them optional.
             long at = java.time.OffsetDateTime.parse(e.optString("date")).toInstant().toEpochMilli();
-            out.add(new Game(at, league, name(home, shortNames), name(away, shortNames),
-                    done ? score(home) : null, done ? score(away) : null, r));
+            Game g = new Game(at, SchedulePanel.competition(league), name(home, shortNames), name(away, shortNames),
+                    done ? score(home) : null, done ? score(away) : null, r);
+            g.homeLogo = SchedulePanel.small(home.getJSONObject("team"));
+            g.awayLogo = SchedulePanel.small(away.getJSONObject("team"));
+            out.add(g);
         }
     }
 
     private static String name(JSONObject competitor, JSONObject shortNames) {
         JSONObject t = competitor.optJSONObject("team");
         String n = t == null ? "" : t.optString("shortDisplayName", t.optString("displayName"));
-        return shortNames.optString(n, n);
+        return SchedulePanel.teamName(shortNames, n);
     }
 
     /** ESPN gives a score as "2" on some endpoints and {"displayValue": "2"} on others. */
@@ -353,8 +361,11 @@ final class FixturesDialog {
                 r = mine > theirs ? 'W' : mine < theirs ? 'L' : 'D';
             }
             String home = e.optString("strHomeTeam"), away = e.optString("strAwayTeam");
-            out.add(new Game(utc.toInstant(ZoneOffset.UTC).toEpochMilli(), e.optString("strLeague"),
-                    shortNames.optString(home, home), shortNames.optString(away, away), done ? hs : null, done ? as : null, r));
+            Game g = new Game(utc.toInstant(ZoneOffset.UTC).toEpochMilli(), SchedulePanel.competition(e.optString("strLeague")),
+                    SchedulePanel.teamName(shortNames, home), SchedulePanel.teamName(shortNames, away), done ? hs : null, done ? as : null, r);
+            g.homeLogo = SchedulePanel.tiny(e.optString("strHomeTeamBadge"));
+            g.awayLogo = SchedulePanel.tiny(e.optString("strAwayTeamBadge"));
+            out.add(g);
         }
     }
 }

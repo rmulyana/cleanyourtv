@@ -79,27 +79,33 @@ final class SchedulePanel {
     private final JSONArray standingsCfg;
     /** config "short_names": {"Manchester United": "Man Utd"}, applied to both sides of a match. */
     private final JSONObject shortNames;
-    /** config "team_colors": {"Man Utd": "#7A1F2B"}, keyed by the shown (short) name; that side gets a badge.
+    /** config "team_colors": {"Man Utd": "#7A1F2B"}, keyed by the shown (short) name; that side's name is bold.
      *  An optional second colour ("#F2F2F2 #B0001B") sets the text; otherwise black or white by the background. */
     private final JSONObject teamColors;
-    private final Typeface light, medium, footballFont;
+    private final Typeface light, medium, footballFont, boldFont;
     private TextView[] prayerNames, prayerTimes, hourNames, hourTemps;
 
     static final class Match {
         final long at;
-        final String text;
+        final String text, homeLogo, awayLogo;
 
-        Match(long at, String text) {
+        Match(long at, String text, String homeLogo, String awayLogo) {
             this.at = at;
             this.text = text;
+            this.homeLogo = homeLogo;
+            this.awayLogo = awayLogo;
         }
     }
+
+    /** Logos still loading for the football panel; one redraw follows when the first arrives. */
+    private boolean logoRedrawPending;
 
     SchedulePanel(View root, JSONObject cfg, Typeface light, Typeface medium) {
         this.root = root;
         this.light = light;
         this.medium = medium;
         this.footballFont = root.getResources().getFont(R.font.firacode_regular);   // the regular weight the panel texts use
+        boldFont = root.getResources().getFont(R.font.firacode_bold);
         footballList = root.findViewById(R.id.footballList);
         weatherTemp = root.findViewById(R.id.weatherTemp);
         weatherNow = root.findViewById(R.id.weatherNow);
@@ -287,16 +293,16 @@ final class SchedulePanel {
     private void show() {
         String waiting = fetchedAt == 0 ? "Memuat…" : "Belum ada data";
         long now = System.currentTimeMillis();
-        List<String> lines = new ArrayList<>();
-        for (Match m : matches) if (m.at + LIVE_MS >= now && lines.size() < 4) lines.add(m.text);
-        if (lines.isEmpty()) lines.add(waiting);
+        List<Match> lines = new ArrayList<>();
+        for (Match m : matches) if (m.at + LIVE_MS >= now && lines.size() < 4) lines.add(m);
+        if (lines.isEmpty()) lines.add(new Match(0, waiting, "", ""));
         footballList.removeAllViews();
         float d = root.getResources().getDisplayMetrics().density;
-        for (String line : lines) {
+        for (Match m : lines) {
             TextView v = text(12, footballFont, 0xE6FFFFFF);
             v.setEllipsize(android.text.TextUtils.TruncateAt.END);
             v.setPadding(0, (int) (2 * d), 0, (int) (5 * d));
-            v.setText(badges(line, d));
+            v.setText(withLogos(m, d, Math.round(13 * d)));
             footballList.addView(v);
         }
         if (weatherOn) showWeather(waiting);
@@ -365,7 +371,7 @@ final class SchedulePanel {
             JSONObject c = standingsCfg.optJSONObject(i);
             LinearLayout row = (LinearLayout) standingsRows.getChildAt(pos);
             String v = standings != null && i < standings.length ? standings[i] : null;
-            String[] cells = {c == null ? "" : c.optString("name"), c == null ? "" : c.optString("league"), "", ""};
+            String[] cells = {c == null ? "" : c.optString("name"), c == null ? "" : competition(c.optString("league")), "", ""};
             if (v == null) cells[2] = waiting;
             else if (v.isEmpty()) cells[2] = "di luar 5 besar";
             else {
@@ -378,6 +384,9 @@ final class SchedulePanel {
                 tv.setText(cells[k]);
                 tv.setTextColor(k == 1 ? 0x8CFFFFFF : 0xE6FFFFFF);
             }
+            String[] parts = v == null ? new String[0] : v.split(" ");
+            Logos.into((TextView) row.getChildAt(0), parts.length > 2 ? parts[2] : "",
+                    Math.round(16 * root.getResources().getDisplayMetrics().density));
             // Status text spans the last two cells.
             ((LinearLayout.LayoutParams) row.getChildAt(2).getLayoutParams()).weight = v == null || v.isEmpty() ? 3.4f : 1.4f;
             row.getChildAt(3).setVisibility(v == null || v.isEmpty() ? View.GONE : View.VISIBLE);
@@ -481,7 +490,7 @@ final class SchedulePanel {
                     if (ev != null && ev.length() > 0) {
                         JSONObject e0 = ev.getJSONObject(0);
                         String n = String.valueOf(id).equals(e0.optString("idHomeTeam")) ? e0.optString("strHomeTeam") : e0.optString("strAwayTeam");
-                        TEAM_NAMES.put(id, names.optString(n, n));
+                        TEAM_NAMES.put(id, teamName(names, n));
                     }
                     for (int i = 0; ev != null && i < ev.length(); i++) {
                         Match m = parse(ev.getJSONObject(i), names);
@@ -545,13 +554,14 @@ final class SchedulePanel {
                     JSONObject e = entries.getJSONObject(i);
                     if (!p[2].equals(e.getJSONObject("team").optString("id"))) continue;
                     String rank = "", points = "";
+                    String logo = small(e.getJSONObject("team"));
                     JSONArray stats = e.getJSONArray("stats");
                     for (int k = 0; k < stats.length(); k++) {
                         JSONObject s = stats.getJSONObject(k);
                         if (s.optString("name").equals("rank")) rank = s.optString("displayValue");
                         if (s.optString("name").equals("points")) points = s.optString("displayValue");
                     }
-                    return rank + " " + points;
+                    return rank + " " + points + (logo.isEmpty() ? "" : " " + logo);
                 }
             }
             return "";
@@ -562,11 +572,54 @@ final class SchedulePanel {
                     .getJSONArray("table");
             for (int i = 0; i < table.length(); i++) {
                 JSONObject r = table.getJSONObject(i);
-                if (p[2].equals(r.optString("idTeam"))) return r.optString("intRank") + " " + r.optString("intPoints");
+                if (p[2].equals(r.optString("idTeam"))) {
+                    String logo = r.optString("strBadge");
+                    return r.optString("intRank") + " " + r.optString("intPoints") + (logo.isEmpty() ? "" : " " + logo);
+                }
             }
             return "";
         }
         throw new IllegalArgumentException("unknown source " + source);
+    }
+
+    /**
+     * A competition's short name: "English Premier League" → "EPL", "International Friendlies" → "Uji Coba",
+     * "AFC Champions League Two" → "ACL 2". Unknown names pass through. Rules run in order, first match wins.
+     */
+    static String competition(String name) {
+        String n = name.toLowerCase(Locale.ROOT);
+        if (n.contains("friendl")) return "Uji Coba";
+        if (n.contains("world cup") && n.contains("qualif")) return "Kual. Piala Dunia";
+        if (n.contains("world cup")) return "Piala Dunia";
+        if (n.contains("asian cup") && n.contains("qualif")) return "Kual. Piala Asia";
+        if (n.contains("asian cup")) return "Piala Asia";
+        if (n.contains("asean") || n.contains("aff ")) return "Piala AFF";
+        if (n.contains("champions league elite")) return "ACL Elite";
+        if (n.contains("champions league two") || n.contains("champions league 2")) return "ACL 2";
+        if (n.contains("afc champions league")) return "ACL";
+        if (n.contains("conference league")) return "UECL";
+        if (n.contains("europa league")) return "UEL";
+        if (n.contains("champions league")) return "UCL";
+        if (n.contains("nations league")) return "UNL";
+        if (n.contains("super cup") && n.contains("uefa")) return "Piala Super UEFA";
+        if (n.contains("club world cup")) return "Piala Dunia Antarklub";
+        if (n.contains("indonesia") || n.equals("liga 1") || n.equals("bri liga 1")) return "Liga 1";
+        if (n.contains("premier league") && !n.contains("scottish")) return "EPL";
+        if (n.contains("fa cup")) return "FA Cup";
+        if (n.contains("efl cup") || n.contains("league cup") || n.contains("carabao")) return "EFL Cup";
+        if (n.contains("community shield")) return "Community Shield";
+        if (n.contains("serie a")) return "Serie A";
+        if (n.contains("coppa italia")) return "Coppa Italia";
+        if (n.contains("supercoppa")) return "Supercoppa";
+        return name;
+    }
+
+    /** An ESPN team's logo at 80 px through ESPN's image resizer (the listed one is 500 px), or "". */
+    static String small(JSONObject team) {
+        JSONArray logos = team.optJSONArray("logos");
+        String href = logos == null || logos.length() == 0 ? "" : logos.optJSONObject(0).optString("href");
+        int at = href.indexOf("/i/teamlogos/");
+        return at < 0 ? href : "https://a.espncdn.com/combiner/i?img=" + href.substring(at) + "&h=80&w=80";
     }
 
     private static Match parse(JSONObject e, JSONObject shortNames) {
@@ -581,10 +634,21 @@ final class SchedulePanel {
         ZonedDateTime local = utc.atZone(ZoneOffset.UTC).withZoneSameInstant(ZoneId.systemDefault());
         String home = e.optString("strHomeTeam"), away = e.optString("strAwayTeam");
         return new Match(local.toInstant().toEpochMilli(),
-                matchLine(local, shortNames.optString(home, home), shortNames.optString(away, away)));
+                matchLine(local, teamName(shortNames, home), teamName(shortNames, away)),
+                tiny(e.optString("strHomeTeamBadge")), tiny(e.optString("strAwayTeamBadge")));
     }
 
-    /** The line with each side named in "team_colors" drawn as a white-on-colour badge. */
+    /** A club's shown name: config "short_names" first, then every "United" as "Utd" (Madura Utd, Java Utd). */
+    static String teamName(JSONObject shortNames, String name) {
+        return shortNames.optString(name, name).replaceAll("\\bUnited\\b", "Utd");
+    }
+
+    /** TheSportsDB's 50 px rendition of a badge URL ("" stays ""). */
+    static String tiny(String badge) {
+        return badge.isEmpty() || badge.equals("null") ? "" : badge.endsWith("/tiny") ? badge : badge + "/tiny";
+    }
+
+    /** The line with each side named in "team_colors" in bold. */
     private CharSequence badges(String line, float d) {
         android.text.SpannableString out = null;
         for (java.util.Iterator<String> it = teamColors.keys(); it.hasNext(); ) {
@@ -594,7 +658,7 @@ final class SchedulePanel {
             int[] colors = teamColor(teamColors, name);
             if (colors == null) continue;
             if (out == null) out = new android.text.SpannableString(line);
-            out.setSpan(new Badge(colors[0], colors[1], d), at, at + name.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            out.setSpan(new Bold(boldFont), at, at + name.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         return out == null ? line : out;
     }
@@ -624,6 +688,70 @@ final class SchedulePanel {
         }
     }
 
+    /**
+     * The match line with each side's logo (on its grey disc) before its name, then the followed clubs in bold. The logos
+     * go in first: a span would swallow text inserted at its start.
+     */
+    private CharSequence withLogos(Match m, float d, int size) {
+        String s = m.text;
+        int bar = s.indexOf(" | "), vs = s.indexOf(" v ", bar + 3);
+        if (bar < 0 || vs < 0) return badges(s, d);
+        String home = s.substring(bar + 3, vs), away = s.substring(vs + 3);
+        android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(s);
+        // The away side first, so inserting it leaves the home side's index unchanged.
+        logo(b, vs + 3, m.awayLogo, size, d);
+        logo(b, bar + 3, m.homeLogo, size, d);
+        int homeAt = bar + 4, awayAt = homeAt + home.length() + 4;   // each logo is one character
+        badge(b, homeAt, home, d);
+        badge(b, awayAt, away, d);
+        return b;
+    }
+
+    private void badge(android.text.SpannableStringBuilder b, int at, String name, float d) {
+        int[] c = teamColor(teamColors, name);
+        if (c != null) b.setSpan(new Bold(boldFont), at, at + name.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
+    private void logo(android.text.SpannableStringBuilder b, int at, String url, int size, float density) {
+        android.graphics.drawable.Drawable d = Logos.cached(root.getResources(), url, size);
+        if (d == null && url != null && !url.isEmpty() && !logoRedrawPending) {
+            logoRedrawPending = true;
+            Logos.fetch(root.getContext(), url, size, () -> {
+                logoRedrawPending = false;
+                show();
+            });
+        }
+        b.insert(at, "\uFFFC");
+        b.setSpan(new CenteredImage(d != null ? d : Logos.blank(size), Math.round(4 * density)), at, at + 1,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
+    /** An inline image centred on the text line (Android 9 has no ImageSpan.ALIGN_CENTER). */
+    static final class CenteredImage extends android.text.style.ReplacementSpan {
+        private final android.graphics.drawable.Drawable d;
+        private final int gap;   // after the image, instead of a space character (narrower in a tight line)
+
+        CenteredImage(android.graphics.drawable.Drawable d, int gap) {
+            this.d = d;
+            this.gap = gap;
+        }
+
+        @Override
+        public int getSize(android.graphics.Paint p, CharSequence t, int start, int end, android.graphics.Paint.FontMetricsInt fm) {
+            return d.getBounds().width() + gap;
+        }
+
+        @Override
+        public void draw(android.graphics.Canvas c, CharSequence t, int start, int end, float x, int top, int y, int bottom,
+                         android.graphics.Paint p) {
+            float mid = y + (p.ascent() + p.descent()) / 2;
+            c.save();
+            c.translate(x, mid - d.getBounds().height() / 2f);
+            d.draw(c);
+            c.restore();
+        }
+    }
+
     /** Where {@code name} starts as the home or away side of a {@link #matchLine}, or -1. */
     static int teamStart(String line, String name) {
         int bar = line.indexOf(" | "), vs = line.indexOf(" v ", bar + 3);
@@ -633,39 +761,23 @@ final class SchedulePanel {
     }
 
     /** Rounded team-colour box with a thin light border and text: legible on the dark red home even for navy or maroon. */
-    static final class Badge extends android.text.style.ReplacementSpan {
-        private final int fill, text;
-        private final float d;
+    /** Bold Fira Code over a followed club's name; the monospace width does not change, so " | " stays aligned. */
+    static final class Bold extends android.text.style.MetricAffectingSpan {
+        private final Typeface bold;
 
-        Badge(int fill, int text, float d) {
-            this.fill = fill;
-            this.text = text;
-            this.d = d;
+        Bold(Typeface bold) {
+            this.bold = bold;
         }
 
         @Override
-        public int getSize(android.graphics.Paint p, CharSequence t, int start, int end, android.graphics.Paint.FontMetricsInt fm) {
-            return Math.round(p.measureText(t, start, end) + 12 * d);
+        public void updateDrawState(android.text.TextPaint p) {
+            p.setTypeface(bold);
+            p.setColor(0xFFFFFFFF);
         }
 
         @Override
-        public void draw(android.graphics.Canvas c, CharSequence t, int start, int end, float x, int top, int y, int bottom,
-                         android.graphics.Paint p) {
-            int color = p.getColor();
-            android.graphics.Paint.Style style = p.getStyle();
-            android.graphics.RectF r = new android.graphics.RectF(x + d, y + p.ascent() - d, x + p.measureText(t, start, end) + 11 * d,
-                    y + p.descent() + d);
-            p.setStyle(android.graphics.Paint.Style.FILL);
-            p.setColor(fill);
-            c.drawRoundRect(r, 4 * d, 4 * d, p);
-            p.setStyle(android.graphics.Paint.Style.STROKE);
-            p.setStrokeWidth(1.2f * d);
-            p.setColor(0x80FFFFFF);
-            c.drawRoundRect(r, 4 * d, 4 * d, p);
-            p.setStyle(style);
-            p.setColor(text);
-            c.drawText(t, start, end, x + 6 * d, y, p);
-            p.setColor(color);
+        public void updateMeasureState(android.text.TextPaint p) {
+            p.setTypeface(bold);
         }
     }
 

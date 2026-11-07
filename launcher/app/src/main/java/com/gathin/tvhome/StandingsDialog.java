@@ -113,7 +113,7 @@ final class StandingsDialog {
         for (int i = 0; i < clubs.size(); i++) {
             if (i > 0) t.append("  ·  ");
             int start = t.length();
-            t.append(clubs.get(i).optString("league"));
+            t.append(SchedulePanel.competition(clubs.get(i).optString("league")));
             t.setSpan(new ForegroundColorSpan(i == page ? 0xFFFFFFFF : 0x66FFFFFF), start, t.length(),
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
@@ -156,8 +156,10 @@ final class StandingsDialog {
         }
         for (String[] r : table) {
             int[] c = mine.get(r[8]);
-            rows.addView(row(new String[]{r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]}, r[9],
-                    c != null ? c[1] : 0xE6FFFFFF, c != null ? c[0] : 0, 1));
+            LinearLayout row = row(new String[]{r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]}, r[9],
+                    c != null ? c[1] : 0xE6FFFFFF, c != null ? c[0] : 0, 1);
+            Logos.into((TextView) row.getChildAt(1), r[10], px(15));
+            rows.addView(row);
         }
         String source = clubs.get(page).optString("source");
         status.setText(source.startsWith("sportsdb:")
@@ -230,7 +232,7 @@ final class StandingsDialog {
 
     /**
      * Rows of {rank, club, played, won, drawn, lost, goal difference, points, team id, last five results
-     * (W/D/L, oldest first)}, by rank, from a
+     * (W/D/L, oldest first), logo URL}, by rank, from a
      * standings source ("espn:&lt;league&gt;:&lt;team id&gt;" or "sportsdb:&lt;league id&gt;:&lt;team id&gt;").
      */
     static List<String[]> table(String source) throws Exception {
@@ -250,10 +252,10 @@ final class StandingsDialog {
                         JSONObject st = stats.getJSONObject(k);
                         s.put(st.optString("name"), st.optString("displayValue"));
                     }
-                    out.add(new String[]{s.getOrDefault("rank", ""), team.optString("shortDisplayName", team.optString("displayName")),
+                    out.add(new String[]{s.getOrDefault("rank", ""), SchedulePanel.teamName(new JSONObject(), team.optString("shortDisplayName", team.optString("displayName"))),
                             s.getOrDefault("gamesPlayed", ""), s.getOrDefault("wins", ""), s.getOrDefault("ties", ""),
                             s.getOrDefault("losses", ""), s.getOrDefault("pointDifferential", ""), s.getOrDefault("points", ""),
-                            team.optString("id"), form.getOrDefault(team.optString("id"), "")});
+                            team.optString("id"), form.getOrDefault(team.optString("id"), ""), SchedulePanel.small(team)});
                 }
             }
         } else if (p.length == 3 && p[0].equals("sportsdb")) {
@@ -262,11 +264,12 @@ final class StandingsDialog {
             for (int i = 0; i < t.length(); i++) {
                 JSONObject r = t.getJSONObject(i);
                 String gd = r.optString("intGoalDifference");
-                out.add(new String[]{r.optString("intRank"), r.optString("strTeam"), r.optString("intPlayed"),
+                out.add(new String[]{r.optString("intRank"), SchedulePanel.teamName(new JSONObject(), r.optString("strTeam")), r.optString("intPlayed"),
                         r.optString("intWin"), r.optString("intDraw"), r.optString("intLoss"),
                         gd.startsWith("-") || gd.equals("0") ? gd : "+" + gd, r.optString("intPoints"), r.optString("idTeam"),
                         // strForm is newest first ("LWWLW": lost the last match); the table shows oldest first.
-                        new StringBuilder(r.optString("strForm").replaceAll("[^WDL]", "")).reverse().toString()});
+                        new StringBuilder(r.optString("strForm").replaceAll("[^WDL]", "")).reverse().toString(),
+                        r.optString("strBadge")});
             }
         } else {
             throw new IllegalArgumentException("unknown source " + source);

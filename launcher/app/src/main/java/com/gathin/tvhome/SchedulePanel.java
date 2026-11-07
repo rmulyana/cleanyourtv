@@ -141,18 +141,15 @@ final class SchedulePanel {
         systemStats.setText(extras.isEmpty() ? text : text + "\n" + extras);
     }
 
-    /** Wi-Fi signal and link speed, and the time since the TV last booted, one per line. Off the main thread. */
-    @SuppressWarnings("deprecation")   // getConnectionInfo: the only way to read RSSI without a network callback
+    /** Wi-Fi link speed, and the time since the TV last booted, one per line. Off the main thread. */
+    @SuppressWarnings("deprecation")   // getConnectionInfo: the only way to read link speed without a network callback
     static String systemExtras(android.content.Context ctx) {
         StringBuilder sb = new StringBuilder();
         try {
             android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) ctx.getSystemService(android.content.Context.WIFI_SERVICE);
             android.net.wifi.WifiInfo info = wm == null ? null : wm.getConnectionInfo();
-            if (info != null && info.getNetworkId() != -1) {
-                int pct = android.net.wifi.WifiManager.calculateSignalLevel(info.getRssi(), 101);
-                sb.append("Wi-Fi ").append(pct).append('%');
-                if (info.getLinkSpeed() > 0) sb.append(" · ").append(info.getLinkSpeed()).append(" Mbps");
-                sb.append('\n');
+            if (info != null && info.getNetworkId() != -1 && info.getLinkSpeed() > 0) {
+                sb.append("Wi-Fi ").append(info.getLinkSpeed()).append(" Mbps\n");
             }
         } catch (Exception ignored) {
             // No Wi-Fi service on this TV: leave the line out.

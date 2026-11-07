@@ -395,6 +395,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
+
+                <TextView
+                    android:id="@+id/standingsUpdated"
+                    style="@style/ScheduleText"
+                    android:layout_marginTop="10dp"
+                    android:maxLines="1"
+                    android:textColor="#8CFFFFFF"
+                    android:textSize="11sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

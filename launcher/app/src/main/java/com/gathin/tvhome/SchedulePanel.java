@@ -64,6 +64,7 @@ final class SchedulePanel {
     private final TextView weatherTemp, weatherNow, prayerCountdown, prayerInfo;
     private final int hijriAdjust;
     private final LinearLayout standingsRows;
+    private final TextView standingsUpdated;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final double lat, lon, elevation;
     private final boolean prayerOn, weatherOn;
@@ -102,6 +103,7 @@ final class SchedulePanel {
         prayerInfo = root.findViewById(R.id.prayerInfo);
         hijriAdjust = cfg.optInt("hijri_adjust", 0);
         standingsRows = root.findViewById(R.id.standingsRows);
+        standingsUpdated = root.findViewById(R.id.standingsUpdated);
         lat = cfg.optDouble("lat", Double.NaN);
         lon = cfg.optDouble("lon", Double.NaN);
         elevation = cfg.optDouble("elevation", 0);
@@ -284,6 +286,10 @@ final class SchedulePanel {
     }
 
     private void showStandings(String waiting) {
+        // The last successful network refresh (matches, weather or standings).
+        ZonedDateTime at = java.time.Instant.ofEpochMilli(fetchedAt).atZone(ZoneId.systemDefault());
+        standingsUpdated.setText(fetchedAt == 0 ? "" : "Diperbarui "
+                + DateTimeFormatter.ofPattern("EEE, d MMM yyyy", ID).format(at).replace(".", "") + " - " + TIME.format(at));
         int n = standingsCfg.length();
         if (standingsRows.getChildCount() != n) {
             standingsRows.removeAllViews();

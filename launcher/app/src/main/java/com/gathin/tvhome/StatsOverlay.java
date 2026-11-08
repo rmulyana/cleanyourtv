@@ -41,8 +41,11 @@ final class StatsOverlay {
     private final double lat, lon, elevation;   // config "schedule"; NaN: no prayer notices
     private java.time.LocalDate prayerDay;
     private int[] prayerMin;
-    private String notice = "";
-    private long noticeUntil;
+    private final java.util.Set<String> followed = new java.util.HashSet<>();   // config "team_colors" keys
+    private final java.util.List<SchedulePanel.Match> kickoffs = new java.util.ArrayList<>();
+    private long kickoffUntil;
+    private String prayer = "";
+    private long prayerUntil;
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -74,12 +77,17 @@ final class StatsOverlay {
     }
 
     /**
-     * For 15 s from a followed club's kick-off, "⚽ Man Utd v Aston Villa dimulai", or from a prayer time,
-     * "Waktunya sholat Isya"; else "".
+     * Up to two lines, each shown for 15 s from its last event: the kick-offs ("⚽ Man Utd v Aston Villa
+     * dimulai", or for several "⚽ 2 laga dimulai: Persib · Inter") and the prayer time ("🕌 Waktunya sholat Isya");
+     * else "".
      */
     private String notice(long now) {
         for (SchedulePanel.Match m : SchedulePanel.matches()) {
-            if (m.at > checkedTo && m.at <= now) announce("\u26BD " + SchedulePanel.fixture(m) + " dimulai", now);
+            if (m.at > checkedTo && m.at <= now) {
+                if (now >= kickoffUntil) kickoffs.clear();
+                kickoffs.add(m);
+                kickoffUntil = now + NOTICE_MS;
+            }
         }
         if (!Double.isNaN(lat)) {
             java.time.ZonedDateTime today = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault());
@@ -90,16 +98,37 @@ final class StatsOverlay {
             long midnight = today.toInstant().toEpochMilli();
             for (int i = 0; i < Prayer.NAMES.length; i++) {
                 long at = midnight + prayerMin[i] * 60_000L;
-                if (at > checkedTo && at <= now) announce("Waktunya sholat " + Prayer.NAMES[i], now);
+                if (at > checkedTo && at <= now) {
+                    prayer = "\uD83D\uDD4C Waktunya sholat " + Prayer.NAMES[i];
+                    prayerUntil = now + NOTICE_MS;
+                }
             }
         }
         checkedTo = now;
-        return now < noticeUntil ? notice : "";
+        StringBuilder out = new StringBuilder();
+        if (now < kickoffUntil) {
+            java.util.Set<String> fixtures = new java.util.LinkedHashSet<>();   // a derby of two followed clubs is listed twice
+            for (SchedulePanel.Match m : kickoffs) fixtures.add(SchedulePanel.fixture(m));
+            out.append(kickoffNotice(fixtures, followed));
+        }
+        if (now < prayerUntil) out.append(out.length() > 0 ? "\n" : "").append(prayer);
+        return out.toString();
     }
 
-    private void announce(String text, long now) {
-        notice = text;
-        noticeUntil = now + NOTICE_MS;
+    /**
+     * "⚽ Man Utd v Aston Villa dimulai" for one kick-off; for several, one line with each match's followed
+     * clubs ("⚽ 4 laga dimulai: Persib · Inter · Man Utd · Indonesia"), the home side when neither is followed.
+     */
+    static String kickoffNotice(java.util.Collection<String> fixtures, java.util.Set<String> followed) {
+        if (fixtures.size() == 1) return "\u26BD " + fixtures.iterator().next() + " dimulai";
+        java.util.Set<String> clubs = new java.util.LinkedHashSet<>();
+        for (String f : fixtures) {
+            String[] sides = f.split(" v ", 2);
+            int before = clubs.size();
+            for (String side : sides) if (followed.contains(side)) clubs.add(side);
+            if (clubs.size() == before) clubs.add(sides[0]);
+        }
+        return "\u26BD " + fixtures.size() + " laga dimulai: " + String.join(" \u00B7 ", clubs);
     }
 
     private final SharedPreferences.OnSharedPreferenceChangeListener onToggle = (p, key) -> {
@@ -112,6 +141,8 @@ final class StatsOverlay {
         wm = (WindowManager) ctx.getSystemService(Context.WINDOW_SERVICE);
         prefs(ctx).registerOnSharedPreferenceChangeListener(onToggle);
         org.json.JSONObject sched = Config.load(ctx).schedule;   // the home panel's city, for prayer-time notices
+        org.json.JSONObject tc = sched == null ? null : sched.optJSONObject("team_colors");
+        if (tc != null) for (java.util.Iterator<String> it = tc.keys(); it.hasNext(); ) followed.add(it.next());
         lat = sched == null ? Double.NaN : sched.optDouble("lat", Double.NaN);
         lon = sched == null ? Double.NaN : sched.optDouble("lon", Double.NaN);
         elevation = sched == null ? 0 : sched.optDouble("elevation", 0);
@@ -153,7 +184,7 @@ final class StatsOverlay {
         view.setTypeface(ctx.getResources().getFont(R.font.firacode_regular));
         view.setTextColor(0xF2FFFFFF);
         view.setIncludeFontPadding(false);
-        view.setMaxLines(2);   // the stats, and for 15 s a kick-off notice under them
+        view.setMaxLines(3);   // the stats, and for 15 s a kick-off line and a prayer line under them
         view.setPadding(Math.round(8 * d), Math.round(4 * d), Math.round(8 * d), Math.round(4 * d));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0x80000000);

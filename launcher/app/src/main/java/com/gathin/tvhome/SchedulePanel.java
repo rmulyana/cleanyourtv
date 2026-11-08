@@ -322,9 +322,8 @@ final class SchedulePanel {
             android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(withLogos(shown, d, Math.round(13 * d)));
             if (label != null && slot >= 3) {
                 boolean live = label.equals(LIVE);
-                b.setSpan(new android.text.style.ForegroundColorSpan(live ? 0xFFFF5A5A : 0xFF2E9E5B), slot, slot + 5,
+                b.setSpan(new Bold(boldFont, live ? 0xFFFF5A5A : 0xFF2E9E5B), slot, slot + 5,
                         android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                b.setSpan(new Bold(boldFont), slot, slot + 5, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 if (live) liveDots.add(new Object[]{v, b, slot});
             }
             v.setText(b);
@@ -829,15 +828,22 @@ final class SchedulePanel {
     /** Bold Fira Code over a followed club's name; the monospace width does not change, so " | " stays aligned. */
     static final class Bold extends android.text.style.MetricAffectingSpan {
         private final Typeface bold;
+        final int color;
 
         Bold(Typeface bold) {
+            this(bold, 0xFFFFFFFF);
+        }
+
+        /** In {@code color}: a ForegroundColorSpan under this one would be painted over. */
+        Bold(Typeface bold, int color) {
             this.bold = bold;
+            this.color = color;
         }
 
         @Override
         public void updateDrawState(android.text.TextPaint p) {
             p.setTypeface(bold);
-            p.setColor(0xFFFFFFFF);
+            p.setColor(color);
         }
 
         @Override

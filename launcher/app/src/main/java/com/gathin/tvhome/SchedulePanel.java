@@ -306,7 +306,8 @@ final class SchedulePanel {
         String waiting = fetchedAt == 0 ? "Memuat…" : "Belum ada data";
         long now = System.currentTimeMillis();
         List<Match> lines = new ArrayList<>();
-        for (Match m : matches) if (m.at + LIVE_MS >= now && lines.size() < 4) lines.add(m);
+        // A finished match stays (as FIN) until its club's next one is listed: the free key's "next" lags.
+        for (Match m : matches) if (lines.size() < 4) lines.add(m);
         if (lines.isEmpty()) lines.add(new Match(0, waiting, "", ""));
         footballList.removeAllViews();
         liveDots.clear();
@@ -322,7 +323,8 @@ final class SchedulePanel {
             android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(withLogos(shown, d, Math.round(13 * d)));
             if (label != null && slot >= 3) {
                 boolean live = label.equals(LIVE);
-                b.setSpan(new Bold(boldFont, live ? 0xFFFF5A5A : 0xFF2E9E5B), slot, slot + 5,
+                b.setSpan(label.equals(FIN) ? new android.text.style.ForegroundColorSpan(0x80FFFFFF)
+                                : new Bold(boldFont, live ? 0xFFFF5A5A : 0xFF2E9E5B), slot, slot + 5,
                         android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 if (live) liveDots.add(new Object[]{v, b, slot});
             }
@@ -713,14 +715,16 @@ final class SchedulePanel {
     }
 
     static final String LIVE = "\u25CFLIVE";   // "●LIVE": five characters, like the "23.30" it replaces
+    static final String FIN = "FIN  ";
 
     /**
      * What a match's time slot shows: null before the last {@link #SOON_MS} (keep the time), "25m" counting down
-     * to kick-off, then {@link #LIVE} for {@link #LIVE_MS} (no live scores on the free key, so by the clock).
+     * to kick-off, then {@link #LIVE} for {@link #LIVE_MS} (no live scores on the free key, so by the clock), then
+     * {@link #FIN}.
      * Always five characters so the " | " stays aligned.
      */
     static String kickoffLabel(long kickoff, long now) {
-        if (now >= kickoff) return now < kickoff + LIVE_MS ? LIVE : null;
+        if (now >= kickoff) return now < kickoff + LIVE_MS ? LIVE : FIN;
         if (kickoff - now > SOON_MS) return null;
         long minutes = Math.max(1, (kickoff - now + 59_999) / 60_000);
         return String.format(Locale.ROOT, "%-5s", minutes + "m");

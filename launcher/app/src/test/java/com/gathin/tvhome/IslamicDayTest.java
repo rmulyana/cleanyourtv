@@ -64,6 +64,19 @@ public class IslamicDayTest {
     }
 
     @Test
+    public void dayEventsAndSurahs() {
+        assertEquals(java.util.Arrays.asList("Idul Adha"), IslamicDay.events(g(1448, 12, 10), -1));
+        LocalDate plain = g(1448, 6, 20);
+        while (plain.getDayOfWeek() != DayOfWeek.TUESDAY) plain = plain.plusDays(1);
+        assertTrue(IslamicDay.events(plain, -1).isEmpty());
+        assertTrue(IslamicDay.events(g(1448, 6, 13), -1).contains("Puasa Ayyamul Bidh"));
+        assertEquals(114, IslamicDay.SURAH.length);
+        assertEquals("Al-Fatihah", IslamicDay.SURAH[0]);
+        assertEquals("An-Nas", IslamicDay.SURAH[113]);
+        assertEquals("https://cdn.mp3quran.net/audio/mishary-alafasy/r1/036.mp3", IslamicDay.surahAudioUrl(36));
+    }
+
+    @Test
     public void dailyTexts() {
         LocalDate d = LocalDate.of(2026, 11, 14);
         assertTrue(IslamicDay.verse(d) != IslamicDay.verse(d.plusDays(1)));

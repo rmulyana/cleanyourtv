@@ -45,6 +45,10 @@ public class ScreensaverActivity extends Activity {
     private final java.util.Map<String, String> titles = new java.util.concurrent.ConcurrentHashMap<>();
     /** config "screensaver_sound": false leaves only the clock face; the arrows and OK do nothing. */
     private boolean soundOn;
+    /** config "screensaver_murottal": streams a whole surah instead (takes the place of the sounds and music). */
+    private boolean murottal;
+    private MediaPlayer recitation;
+    private int surah;   // 1–114
 
     @Override
     protected void onCreate(Bundle state) {
@@ -52,7 +56,10 @@ public class ScreensaverActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         face = new SaverView(this);
         setContentView(face);
-        soundOn = Config.load(this).screensaverSound;
+        Config cfg = Config.load(this);
+        soundOn = cfg.screensaverSound;
+        murottal = cfg.screensaverMurottal;
+        surah = Math.max(1, Math.min(114, prefs().getInt("surah", 1)));
         sound = prefs().getInt("sound", 0);
         if (sound < 0 || sound >= SOUNDS.length) sound = 0;
         tracks = musicFiles();
@@ -77,6 +84,10 @@ public class ScreensaverActivity extends Activity {
     protected void onResume() {
         super.onResume();
         face.start();
+        if (murottal) {
+            playSurah(false);
+            return;
+        }
         if (!soundOn) return;
         playAmbient(false);
         playMusic(false, true);
@@ -90,6 +101,8 @@ public class ScreensaverActivity extends Activity {
         ambient = null;
         release(music);
         music = null;
+        release(recitation);
+        recitation = null;
         loaded = -1;
         super.onPause();
         finish();   // Home or another app ends it; the button opens a fresh one
@@ -97,6 +110,7 @@ public class ScreensaverActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (murottal) return murottalKey(keyCode) || super.onKeyDown(keyCode, event);
         if (!soundOn) return super.onKeyDown(keyCode, event);
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
@@ -143,6 +157,70 @@ public class ScreensaverActivity extends Activity {
                 return true;
             default:
                 return super.onKeyDown(keyCode, event);
+        }
+    }
+
+    // ---- murottal -----------------------------------------------------------------------------------
+
+    /** Left/Right: previous or next surah (wrapping 114 ↔ 1); OK: pause or resume. Other keys pass through. */
+    private boolean murottalKey(int keyCode) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+                surah = Math.floorMod(surah - 1 + (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1), 114) + 1;
+                prefs().edit().putInt("surah", surah).apply();
+                paused = false;
+                playSurah(true);
+                return true;
+            case KeyEvent.KEYCODE_DPAD_CENTER:
+            case KeyEvent.KEYCODE_ENTER:
+                if (recitation == null) return true;
+                paused = !paused;
+                try {
+                    if (paused) recitation.pause();
+                    else recitation.start();
+                } catch (IllegalStateException ignored) {
+                    // still loading: the prepared listener honours paused
+                }
+                face.showNote(paused ? "Dijeda" : "Lanjut");
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /** Streams {@link #surah}; at its end the next one follows. */
+    private void playSurah(boolean announce) {
+        release(recitation);
+        MediaPlayer p = new MediaPlayer();
+        recitation = p;
+        String name = surah + ". " + IslamicDay.SURAH[surah - 1];
+        // Android's player takes ~20 s to open a long MP3 over the TV's network; say so until it plays.
+        face.setNowPlaying("♪ Memuat murottal… " + name);
+        if (announce) face.showNote("◀ ▶  " + name);
+        try {
+            p.setAudioAttributes(new android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build());
+            p.setDataSource(IslamicDay.surahAudioUrl(surah));
+            p.setOnPreparedListener(mp -> {
+                if (recitation != mp) return;
+                face.setNowPlaying("♪ Murottal · " + name);
+                if (!paused) mp.start();
+            });
+            p.setOnCompletionListener(mp -> {
+                if (recitation != mp) return;
+                surah = surah % 114 + 1;
+                prefs().edit().putInt("surah", surah).apply();
+                playSurah(false);
+            });
+            p.setOnErrorListener((mp, what, extra) -> {
+                if (recitation == mp) face.setNowPlaying("♪ Murottal tidak bisa diputar, cek internet");
+                return true;
+            });
+            p.prepareAsync();
+        } catch (Exception e) {
+            face.showNote("Murottal tidak bisa diputar");
         }
     }
 

@@ -16,25 +16,34 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
+import java.util.List;
 
 /**
  * Behind the Islamic calendar panel: one Gregorian month as a Monday-first grid, each day with its Hijri date
- * under it and marks for the sunnah fasts and Islamic holidays ({@link IslamicDay#marks}); today is lit.
- * Left/Right change the month, OK or Back closes. Computed on the TV, no network.
+ * under it and marks for the sunnah fasts and Islamic holidays ({@link IslamicDay#marks}). Like a phone
+ * calendar, the arrows move a selected day (a week with Up/Down), the month follows it, and the selected
+ * day's events show under the grid. Today is lit green, the selection ringed. OK or Back closes.
+ * Computed on the TV, no network.
  */
 final class CalendarDialog {
     private static final String[] DAYS = {"Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"};
     private static final int WEEKS = 6;   // every month fits; shorter ones are padded so the window keeps its height
+    private static final DateTimeFormatter LONG = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", SchedulePanel.ID);
 
     private final Context ctx;
     private final int hijriAdjust;
     private final Typeface regular, medium;
     private final float d;
     private final Dialog dialog;
-    private final TextView title, holidays;
+    private final TextView title, detailDate, detailEvents;
     private final LinearLayout grid;
-    private YearMonth month = YearMonth.now();
+    private final LinearLayout[] cells = new LinearLayout[WEEKS * 7];
+    private final LocalDate today = LocalDate.now();
+    private LocalDate selected = today;
+    private YearMonth shown;   // the month the grid holds
+    private int lead;          // empty cells before day 1
 
     CalendarDialog(Context ctx, int hijriAdjust, Typeface regular, Typeface medium) {
         this.ctx = ctx;
@@ -62,12 +71,15 @@ final class CalendarDialog {
         grid = new LinearLayout(ctx);
         grid.setOrientation(LinearLayout.VERTICAL);
         panel.addView(grid);
-        holidays = text(11, regular, 0xE6FFFFFF);
-        holidays.setPadding(0, px(10), 0, 0);
-        panel.addView(holidays);
+        detailDate = text(12, medium, 0xFFFFFFFF);
+        detailDate.setPadding(0, px(12), 0, 0);
+        panel.addView(detailDate);
+        detailEvents = text(12, regular, 0xE6FFFFFF);
+        detailEvents.setPadding(0, px(4), 0, 0);
+        panel.addView(detailEvents);
         TextView legend = text(11, regular, 0x8CFFFFFF);
-        legend.setPadding(0, px(4), 0, 0);
-        legend.setText("● Puasa Senin/Kamis   ◆ Ayyamul Bidh   ■ Hari besar   ·   ◀ ▶ ganti bulan  ·  Back tutup");
+        legend.setPadding(0, px(10), 0, 0);
+        legend.setText("● Puasa Senin/Kamis   ◆ Ayyamul Bidh   ■ Hari besar   ·   ◀ ▶ ▲ ▼ pilih tanggal  ·  Back tutup");
         panel.addView(legend);
 
         dialog = new Dialog(ctx);
@@ -81,45 +93,60 @@ final class CalendarDialog {
         }
         dialog.setOnKeyListener((di, key, e) -> {
             if (e.getAction() != KeyEvent.ACTION_DOWN) return false;
-            if (key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) {
-                month = month.plusMonths(key == KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1);
-                showMonth();
-                return true;
+            switch (key) {
+                case KeyEvent.KEYCODE_DPAD_LEFT: select(selected.minusDays(1)); return true;
+                case KeyEvent.KEYCODE_DPAD_RIGHT: select(selected.plusDays(1)); return true;
+                case KeyEvent.KEYCODE_DPAD_UP: select(selected.minusWeeks(1)); return true;
+                case KeyEvent.KEYCODE_DPAD_DOWN: select(selected.plusWeeks(1)); return true;
+                case KeyEvent.KEYCODE_DPAD_CENTER:
+                case KeyEvent.KEYCODE_ENTER:
+                    dialog.dismiss();
+                    return true;
+                default:
+                    return false;
             }
-            if (key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER) {
-                dialog.dismiss();
-                return true;
-            }
-            return key == KeyEvent.KEYCODE_DPAD_UP || key == KeyEvent.KEYCODE_DPAD_DOWN;
         });
     }
 
     void show() {
-        showMonth();
+        select(today);
         dialog.show();
     }
 
-    private void showMonth() {
-        LocalDate first = month.atDay(1), last = month.atEndOfMonth(), today = LocalDate.now();
+    /** Moves the selection; the grid is rebuilt only when the month changes, else just the two cells restyle. */
+    private void select(LocalDate date) {
+        LocalDate before = selected;
+        selected = date;
+        if (!YearMonth.from(date).equals(shown)) {
+            buildMonth(YearMonth.from(date));
+        } else {
+            style(before);
+            style(date);
+        }
+        detailDate.setText(LONG.format(date) + "  ·  " + SchedulePanel.hijri(date, hijriAdjust));
+        List<String> events = IslamicDay.events(date, hijriAdjust);
+        detailEvents.setText(events.isEmpty() ? "Tidak ada acara" : String.join("  ·  ", events));
+        detailEvents.setTextColor(events.isEmpty() ? 0x8CFFFFFF : 0xFFCFFFCF);
+    }
+
+    private void buildMonth(YearMonth month) {
+        shown = month;
+        LocalDate first = month.atDay(1), last = month.atEndOfMonth();
         String hFirst = hijriMonth(first), hLast = hijriMonth(last);
         title.setText("KALENDER · " + month.getMonth().getDisplayName(TextStyle.FULL, SchedulePanel.ID).toUpperCase(SchedulePanel.ID)
-                + " " + month.getYear() + "     " + (hFirst.equals(hLast) ? hFirst : hFirst + " – " + hLast)
-                + "     ◀ ▶");
+                + " " + month.getYear() + "     " + (hFirst.equals(hLast) ? hFirst : hFirst + " – " + hLast));
         grid.removeAllViews();
-        int lead = first.getDayOfWeek().getValue() - 1;   // Monday first
-        StringBuilder names = new StringBuilder();
+        lead = first.getDayOfWeek().getValue() - 1;   // Monday first
         for (int week = 0; week < WEEKS; week++) {
             LinearLayout row = new LinearLayout(ctx);
             for (int col = 0; col < 7; col++) {
-                int day = week * 7 + col - lead + 1;
-                LocalDate date = day >= 1 && day <= month.lengthOfMonth() ? month.atDay(day) : null;
-                row.addView(cell(date, today), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-                String name = date == null ? null : IslamicDay.holiday(date, hijriAdjust);
-                if (name != null) names.append(names.length() == 0 ? "" : "   ·   ").append("■ ").append(name).append(' ').append(day);
+                int i = week * 7 + col, day = i - lead + 1;
+                cells[i] = cell(day >= 1 && day <= month.lengthOfMonth() ? month.atDay(day) : null);
+                row.addView(cells[i], new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
             }
             grid.addView(row);
         }
-        holidays.setText(names.length() == 0 ? "Tidak ada hari besar Islam bulan ini" : names);
+        for (int day = 1; day <= month.lengthOfMonth(); day++) style(month.atDay(day));
     }
 
     /** "Jumadil Akhir 1448 H" for the date. */
@@ -129,26 +156,18 @@ final class CalendarDialog {
         return space < 0 ? h : h.substring(space + 1);
     }
 
-    private LinearLayout cell(LocalDate date, LocalDate today) {
+    private LinearLayout cell(LocalDate date) {
         LinearLayout c = new LinearLayout(ctx);
         c.setOrientation(LinearLayout.VERTICAL);
         c.setGravity(Gravity.CENTER_HORIZONTAL);
         c.setPadding(px(2), px(4), px(2), px(4));
-        boolean isToday = date != null && date.equals(today);
-        if (isToday) {
-            GradientDrawable bg = new GradientDrawable();
-            bg.setColor(0xFF2E7D4F);
-            bg.setCornerRadius(px(8));
-            c.setBackground(bg);
-        }
-        TextView top = text(16, isToday ? medium : regular, isToday ? 0xFFFFFFFF : 0xE6FFFFFF);
-        TextView bottom = text(10, regular, isToday ? 0xFFFFFFFF : 0x8CFFFFFF);
+        TextView top = text(16, regular, 0xE6FFFFFF);
+        TextView bottom = text(10, regular, 0x8CFFFFFF);
         if (date != null) {
             int[] h = IslamicDay.hijri(date, hijriAdjust);
             String marks = IslamicDay.marks(date, hijriAdjust);
             top.setText(date.getDayOfMonth() + (marks.isEmpty() ? "" : " " + marks));
             bottom.setText(h == null ? " " : String.valueOf(h[0]));
-            if (!isToday && date.getDayOfWeek() == java.time.DayOfWeek.FRIDAY) top.setTextColor(0xFFCFFFCF);
         } else {
             top.setText(" ");
             bottom.setText(" ");
@@ -158,6 +177,26 @@ final class CalendarDialog {
         c.addView(top);
         c.addView(bottom);
         return c;
+    }
+
+    /** Today: green fill; the selection: a white ring; Fridays: light green numbers. */
+    private void style(LocalDate date) {
+        if (date == null || !YearMonth.from(date).equals(shown)) return;
+        LinearLayout c = cells[lead + date.getDayOfMonth() - 1];
+        boolean isToday = date.equals(today), isSelected = date.equals(selected);
+        GradientDrawable bg = null;
+        if (isToday || isSelected) {
+            bg = new GradientDrawable();
+            bg.setCornerRadius(px(8));
+            bg.setColor(isToday ? 0xFF2E7D4F : 0x26FFFFFF);
+            if (isSelected) bg.setStroke(px(2), 0xFFFFFFFF);
+        }
+        c.setBackground(bg);
+        TextView top = (TextView) c.getChildAt(0), bottom = (TextView) c.getChildAt(1);
+        boolean friday = date.getDayOfWeek() == java.time.DayOfWeek.FRIDAY;
+        top.setTypeface(isToday || isSelected ? medium : regular);
+        top.setTextColor(isToday || isSelected ? 0xFFFFFFFF : friday ? 0xFFCFFFCF : 0xE6FFFFFF);
+        bottom.setTextColor(isToday || isSelected ? 0xFFFFFFFF : 0x8CFFFFFF);
     }
 
     private TextView text(int sp, Typeface tf, int color) {

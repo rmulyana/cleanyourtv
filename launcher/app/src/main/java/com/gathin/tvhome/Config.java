@@ -90,6 +90,8 @@ final class Config {
     boolean screensaverSound = true;
     /** config.json "overlay_stats": false shows only the clock (and the notices) on the overlay, no CPU/RAM/network. */
     boolean overlayStats = true;
+    /** config.json "screensaver_murottal": true makes Home's Screensaver button play the Quran, Left/Right change surah. */
+    boolean screensaverMurottal;
     /** Festive skin from a theme (festival, festival_until, greeting, accent_color); {@link Festival#NONE} if none. */
     final Festival festival;
 
@@ -229,6 +231,7 @@ final class Config {
             cfg.ambientColor = color(json, "ambient_color", 0);
             cfg.screensaverSound = bool(json, "screensaver_sound", true);
             cfg.overlayStats = bool(json, "overlay_stats", true);
+            cfg.screensaverMurottal = bool(json, "screensaver_murottal", false);
         }
         return cfg;
     }

@@ -474,9 +474,18 @@ final class SchedulePanel {
     private void showIslamic() {
         LocalDate today = LocalDate.now();
         LocalDate fast = IslamicDay.nextMondayThursday(today, hijriAdjust);
-        calendarText.setText("Puasa Senin/Kamis · " + (fast == null ? "—" : IslamicDay.when(fast, today))
+        String cal = "Puasa Senin/Kamis · " + (fast == null ? "—" : IslamicDay.when(fast, today))
                 + "\nAyyamul Bidh · " + IslamicDay.rangeLine(IslamicDay.nextAyyamulBidh(today, hijriAdjust), today)
-                + holidayLines(IslamicDay.nextIslamicHolidays(today, hijriAdjust, 2), today));
+                + holidayLines(IslamicDay.nextIslamicHolidays(today, hijriAdjust, 2), today);
+        // Each line's event (before " · ") in bold, so the event and its date read apart.
+        android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(cal);
+        int start = 0;
+        for (String line : cal.split("\n", -1)) {
+            int dot = line.indexOf(" · ");
+            if (dot > 0) b.setSpan(new Bold(boldFont), start, start + dot, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            start += line.length() + 1;
+        }
+        calendarText.setText(b);
         String[] v = IslamicDay.verse(today);
         verseArabic.setText(v[0]);
         verseText.setText("\u201C" + v[1] + "\u201D");

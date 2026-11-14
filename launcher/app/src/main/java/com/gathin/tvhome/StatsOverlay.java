@@ -39,6 +39,7 @@ final class StatsOverlay {
     private static final long NOTICE_MS = 15_000;
     private long checkedTo;            // kick-offs and prayer times up to here are announced (or were before we looked)
     private final double lat, lon, elevation;   // config "schedule"; NaN: no prayer notices
+    private final boolean stats;   // config "overlay_stats": false leaves the clock and the notices only
     private java.time.LocalDate prayerDay;
     private int[] prayerMin;
     private final java.util.Set<String> followed = new java.util.HashSet<>();   // config "team_colors" keys
@@ -140,7 +141,9 @@ final class StatsOverlay {
         this.ctx = ctx;
         wm = (WindowManager) ctx.getSystemService(Context.WINDOW_SERVICE);
         prefs(ctx).registerOnSharedPreferenceChangeListener(onToggle);
-        org.json.JSONObject sched = Config.load(ctx).schedule;   // the home panel's city, for prayer-time notices
+        Config cfg = Config.load(ctx);
+        stats = cfg.overlayStats;
+        org.json.JSONObject sched = cfg.schedule;   // the home panel's city, for prayer-time notices
         org.json.JSONObject tc = sched == null ? null : sched.optJSONObject("team_colors");
         if (tc != null) for (java.util.Iterator<String> it = tc.keys(); it.hasNext(); ) followed.add(it.next());
         lat = sched == null ? Double.NaN : sched.optDouble("lat", Double.NaN);
@@ -229,6 +232,10 @@ final class StatsOverlay {
 
     private String line() {
         StringBuilder s = new StringBuilder(CLOCK.format(LocalTime.now()));
+        if (!stats) {
+            String n = notice(System.currentTimeMillis());
+            return n.isEmpty() ? s.toString() : s + "\n" + n;
+        }
         int c = cpu.sample();
         if (c >= 0) lastCpu = c;
         // Every field is there from the first second, a dash until it has a value, so the line never lengthens.

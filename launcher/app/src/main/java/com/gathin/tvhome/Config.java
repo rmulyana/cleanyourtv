@@ -88,6 +88,8 @@ final class Config {
     int ambientColor;
     /** config.json "screensaver_sound": false makes Home's Screensaver button silent, with no arrow-key sound menu. */
     boolean screensaverSound = true;
+    /** config.json "overlay_stats": false shows only the clock (and the notices) on the overlay, no CPU/RAM/network. */
+    boolean overlayStats = true;
     /** Festive skin from a theme (festival, festival_until, greeting, accent_color); {@link Festival#NONE} if none. */
     final Festival festival;
 
@@ -226,6 +228,7 @@ final class Config {
             cfg.dockLowerDp = integer(json, "dock_lower", 0, 0, 60);
             cfg.ambientColor = color(json, "ambient_color", 0);
             cfg.screensaverSound = bool(json, "screensaver_sound", true);
+            cfg.overlayStats = bool(json, "overlay_stats", true);
         }
         return cfg;
     }

@@ -404,6 +404,55 @@
                     android:textColor="#8CFFFFFF"
                     android:textSize="11sp" />
             </LinearLayout>
+
+            <!-- In place of the two football panels when "islamic" is on: fasts and holidays, then today's verse. -->
+            <LinearLayout
+                android:id="@+id/calendarPanel"
+                style="@style/SchedulePanel"
+                android:layout_marginEnd="20dp"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/ScheduleTitle"
+                    android:text="Kalender" />
+
+                <TextView
+                    android:id="@+id/calendarText"
+                    style="@style/ScheduleText"
+                    android:lineSpacingExtra="5dp"
+                    android:maxLines="4" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/versePanel"
+                style="@style/SchedulePanel"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/ScheduleTitle"
+                    android:text="Ayat hari ini" />
+
+                <TextView
+                    android:id="@+id/verseText"
+                    style="@style/ScheduleText"
+                    android:lineSpacingExtra="3dp"
+                    android:maxLines="3" />
+
+                <TextView
+                    android:id="@+id/verseRef"
+                    style="@style/ScheduleText"
+                    android:layout_marginTop="4dp"
+                    android:gravity="end"
+                    android:maxLines="1"
+                    android:textColor="#8CFFFFFF"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/asmaText"
+                    style="@style/ScheduleText"
+                    android:layout_marginTop="6dp"
+                    android:lineSpacingExtra="3dp"
+                    android:maxLines="2" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

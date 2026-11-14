@@ -77,6 +77,9 @@ final class SchedulePanel {
     /** config "system": the show_stats readings go to their own panel instead of the line under the clock. */
     final boolean systemOn;
     private final TextView systemStats;
+    /** config "islamic": the calendar and verse panels ({@link IslamicDay}) replace the two football panels. */
+    private final boolean islamicOn;
+    private final TextView calendarText, verseText, verseRef, asmaText;
     private final long[] teams;
     private final JSONArray standingsCfg;
     /** config "short_names": {"Manchester United": "Man Utd"}, applied to both sides of a match. */
@@ -181,6 +184,17 @@ final class SchedulePanel {
                 new StandingsDialog(root.getContext(), clubs, teamColors, footballFont, medium).show();
             });
         }
+        islamicOn = cfg.optBoolean("islamic", false);
+        calendarText = root.findViewById(R.id.calendarText);
+        verseText = root.findViewById(R.id.verseText);
+        verseRef = root.findViewById(R.id.verseRef);
+        asmaText = root.findViewById(R.id.asmaText);
+        if (islamicOn) {
+            footballPanel.setVisibility(View.GONE);
+            standingsPanel.setVisibility(View.GONE);
+            root.findViewById(R.id.calendarPanel).setVisibility(View.VISIBLE);
+            root.findViewById(R.id.versePanel).setVisibility(View.VISIBLE);
+        }
         systemOn = cfg.optBoolean("system", false);
         systemStats = root.findViewById(R.id.systemStats);
         View systemPanel = root.findViewById(R.id.systemPanel);
@@ -189,7 +203,7 @@ final class SchedulePanel {
             focusRing(systemPanel);
             systemPanel.setOnClickListener(v -> new SystemDialog(root.getContext(), lastCpu, footballFont, medium).show());
         }
-        root.setVisibility(prayerOn || teams.length > 0 || standingsCfg.length() > 0 ? View.VISIBLE : View.GONE);
+        root.setVisibility(prayerOn || islamicOn || teams.length > 0 || standingsCfg.length() > 0 ? View.VISIBLE : View.GONE);
         if (prayerOn) {
             prayerNames = new TextView[Prayer.NAMES.length];
             prayerTimes = new TextView[Prayer.NAMES.length];
@@ -297,6 +311,7 @@ final class SchedulePanel {
             prayerInfo.setText(hijri(today, hijriAdjust) + " · Imsak " + hhmm(m[0] - Prayer.IMSAK_BEFORE_SUBUH_MIN)
                     + " · Terbit " + hhmm(m[Prayer.TERBIT]));
         }
+        if (islamicOn) showIslamic();
         show();
         boolean wantsNet = teams.length > 0 || weatherOn || standingsCfg.length() > 0;
         if (wantsNet && !fetching && System.currentTimeMillis() - fetchedAt > FETCH_MS) fetch();
@@ -455,6 +470,19 @@ final class SchedulePanel {
 
     private static final String[] HIJRI_MONTHS = {"Muharram", "Safar", "Rabiul Awal", "Rabiul Akhir",
             "Jumadil Awal", "Jumadil Akhir", "Rajab", "Syakban", "Ramadan", "Syawal", "Zulkaidah", "Zulhijah"};
+
+    private void showIslamic() {
+        LocalDate today = LocalDate.now();
+        LocalDate fast = IslamicDay.nextMondayThursday(today, hijriAdjust);
+        calendarText.setText("Puasa Senin/Kamis · " + (fast == null ? "—" : IslamicDay.when(fast, today))
+                + "\nAyyamul Bidh · " + IslamicDay.rangeLine(IslamicDay.nextAyyamulBidh(today, hijriAdjust), today)
+                + "\n" + IslamicDay.holidayLine(IslamicDay.nextIslamicHoliday(today, hijriAdjust), today)
+                + "\n" + IslamicDay.holidayLine(IslamicDay.nextNationalHoliday(today), today));
+        String[] v = IslamicDay.verse(today);
+        verseText.setText("\u201C" + v[0] + "\u201D");
+        verseRef.setText(v[1]);
+        asmaText.setText("Asmaul Husna · " + IslamicDay.asma(today));
+    }
 
     /**
      * "25 Jumadil Awal 1448 H" from Java's Umm al-Qura calendar. {@code adjustDays} (config "hijri_adjust")

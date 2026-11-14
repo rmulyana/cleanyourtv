@@ -86,6 +86,8 @@ final class Config {
     int dockLowerDp;
     /** config.json "ambient_color": one fixed colour for the home glow instead of the focused app's; 0 = per app. */
     int ambientColor;
+    /** config.json "screensaver_sound": false makes Home's Screensaver button silent, with no arrow-key sound menu. */
+    boolean screensaverSound = true;
     /** Festive skin from a theme (festival, festival_until, greeting, accent_color); {@link Festival#NONE} if none. */
     final Festival festival;
 
@@ -223,6 +225,7 @@ final class Config {
             cfg.dockBand = bool(json, "dock_band", true);
             cfg.dockLowerDp = integer(json, "dock_lower", 0, 0, 60);
             cfg.ambientColor = color(json, "ambient_color", 0);
+            cfg.screensaverSound = bool(json, "screensaver_sound", true);
         }
         return cfg;
     }

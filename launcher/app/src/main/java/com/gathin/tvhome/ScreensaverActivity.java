@@ -43,6 +43,8 @@ public class ScreensaverActivity extends Activity {
     private boolean paused;
     /** File name → title tag, read once off the main thread (reading tags scans a long file). */
     private final java.util.Map<String, String> titles = new java.util.concurrent.ConcurrentHashMap<>();
+    /** config "screensaver_sound": false leaves only the clock face; the arrows and OK do nothing. */
+    private boolean soundOn;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -50,6 +52,7 @@ public class ScreensaverActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         face = new SaverView(this);
         setContentView(face);
+        soundOn = Config.load(this).screensaverSound;
         sound = prefs().getInt("sound", 0);
         if (sound < 0 || sound >= SOUNDS.length) sound = 0;
         tracks = musicFiles();
@@ -74,6 +77,7 @@ public class ScreensaverActivity extends Activity {
     protected void onResume() {
         super.onResume();
         face.start();
+        if (!soundOn) return;
         playAmbient(false);
         playMusic(false, true);
     }
@@ -93,6 +97,7 @@ public class ScreensaverActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (!soundOn) return super.onKeyDown(keyCode, event);
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:

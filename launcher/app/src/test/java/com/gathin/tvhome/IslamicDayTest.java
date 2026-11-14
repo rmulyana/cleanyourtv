@@ -50,11 +50,26 @@ public class IslamicDayTest {
     }
 
     @Test
+    public void calendarMarks() {
+        LocalDate isra = g(1448, 7, 27);
+        assertTrue(IslamicDay.marks(isra, -1).contains("■"));
+        assertEquals("Isra Mi'raj", IslamicDay.holiday(isra, -1));
+        LocalDate bidh = g(1448, 6, 14);
+        assertTrue(IslamicDay.marks(bidh, -1).contains("◆"));
+        LocalDate ramadanMonday = g(1448, 9, 10);
+        while (ramadanMonday.getDayOfWeek() != DayOfWeek.MONDAY) ramadanMonday = ramadanMonday.plusDays(1);
+        assertEquals("", IslamicDay.marks(ramadanMonday, -1).replace("■", ""));
+        assertEquals("https://everyayah.com/data/Alafasy_128kbps/001005.mp3",
+                IslamicDay.audioUrl(new String[]{"", "", "QS. Al-Fatihah: 5", "001005"}));
+    }
+
+    @Test
     public void dailyTexts() {
         LocalDate d = LocalDate.of(2026, 11, 14);
         assertTrue(IslamicDay.verse(d) != IslamicDay.verse(d.plusDays(1)));
         for (String[] v : IslamicDay.VERSES) {
-            assertEquals(3, v.length);
+            assertEquals(4, v.length);
+            assertTrue(v[2], v[2].endsWith(": " + Integer.parseInt(v[3].substring(3))));
             assertFalse(v[2], v[0].startsWith("\u0628\u0650\u0633\u0652\u0645\u0650"));   // no Basmalah prefix
             assertTrue(v[2], v[1].length() <= 110);
         }

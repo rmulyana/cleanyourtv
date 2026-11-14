@@ -192,8 +192,14 @@ final class SchedulePanel {
         if (islamicOn) {
             footballPanel.setVisibility(View.GONE);
             standingsPanel.setVisibility(View.GONE);
-            root.findViewById(R.id.calendarPanel).setVisibility(View.VISIBLE);
-            root.findViewById(R.id.versePanel).setVisibility(View.VISIBLE);
+            View calendarPanel = root.findViewById(R.id.calendarPanel), versePanel = root.findViewById(R.id.versePanel);
+            calendarPanel.setVisibility(View.VISIBLE);
+            versePanel.setVisibility(View.VISIBLE);
+            // Focusable from the remote like the others; OK opens the month grid and the large verse.
+            focusRing(calendarPanel);
+            calendarPanel.setOnClickListener(v -> new CalendarDialog(root.getContext(), hijriAdjust, footballFont, medium).show());
+            focusRing(versePanel);
+            versePanel.setOnClickListener(v -> new VerseDialog(root.getContext(), footballFont, medium).show());
         }
         systemOn = cfg.optBoolean("system", false);
         systemStats = root.findViewById(R.id.systemStats);

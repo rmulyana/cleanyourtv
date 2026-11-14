@@ -36,8 +36,7 @@ final class IslamicDay {
     static LocalDate nextMondayThursday(LocalDate today, int adjustDays) {
         for (int i = 0; i < 40; i++) {
             LocalDate d = today.plusDays(i);
-            DayOfWeek w = d.getDayOfWeek();
-            if ((w == DayOfWeek.MONDAY || w == DayOfWeek.THURSDAY) && !noSunnahFast(d, adjustDays)) return d;
+            if (mondayThursday(d, adjustDays)) return d;
         }
         return null;
     }
@@ -47,9 +46,7 @@ final class IslamicDay {
         LocalDate start = null, end = null;
         for (int i = 0; i < 70; i++) {
             LocalDate d = today.plusDays(i);
-            int[] h = hijri(d, adjustDays);
-            boolean bidh = h != null && h[0] >= 13 && h[0] <= 15 && !noSunnahFast(d, adjustDays);
-            if (bidh) {
+            if (ayyamulBidh(d, adjustDays)) {
                 if (start == null) start = d;
                 end = d;
             } else if (start != null) {
@@ -77,11 +74,9 @@ final class IslamicDay {
         java.util.List<Holiday> found = new java.util.ArrayList<>();
         for (int i = 0; i < 400 && found.size() < count; i++) {
             LocalDate d = today.plusDays(i);
-            int[] h = hijri(d, adjustDays);
-            if (h == null) break;
-            for (int k = 0; k < ISLAMIC_DAYS.length; k++) {
-                if (ISLAMIC_DAYS[k][0] == h[1] && ISLAMIC_DAYS[k][1] == h[0]) found.add(new Holiday(ISLAMIC_NAMES[k], d));
-            }
+            if (hijri(d, adjustDays) == null) break;
+            String name = holiday(d, adjustDays);
+            if (name != null) found.add(new Holiday(name, d));
         }
         return found;
     }
@@ -110,72 +105,112 @@ final class IslamicDay {
         return a.equals(b) ? a : a + " – " + b;
     }
 
-    /** Short whole verses: Arabic (Tanzil "quran-simple") and the Kemenag translation, both from api.alquran.cloud. */
+    /**
+     * Short whole verses: Arabic (Tanzil "quran-simple") and the Kemenag translation, both from api.alquran.cloud,
+     * the reference, and the surah and verse as "SSSAAA" for the recitation file ({@link #audioUrl}).
+     */
     static final String[][] VERSES = {
             {"فَإِنَّ مَعَ الْعُسْرِ يُسْرًا",
-                    "Karena sesungguhnya sesudah kesulitan itu ada kemudahan.", "QS. Al-Insyirah: 5"},
+                    "Karena sesungguhnya sesudah kesulitan itu ada kemudahan.", "QS. Al-Insyirah: 5", "094005"},
             {"فَإِذَا فَرَغْتَ فَانْصَبْ",
-                    "Maka apabila kamu telah selesai (dari sesuatu urusan), kerjakanlah dengan sungguh-sungguh (urusan) yang lain.", "QS. Al-Insyirah: 7"},
+                    "Maka apabila kamu telah selesai (dari sesuatu urusan), kerjakanlah dengan sungguh-sungguh (urusan) yang lain.", "QS. Al-Insyirah: 7", "094007"},
             {"وَإِلَىٰ رَبِّكَ فَارْغَبْ",
-                    "Dan hanya kepada Tuhanmulah hendaknya kamu berharap.", "QS. Al-Insyirah: 8"},
+                    "Dan hanya kepada Tuhanmulah hendaknya kamu berharap.", "QS. Al-Insyirah: 8", "094008"},
             {"قُلْ هُوَ اللَّهُ أَحَدٌ",
-                    "Katakanlah: \"Dialah Allah, Yang Maha Esa.\"", "QS. Al-Ikhlas: 1"},
+                    "Katakanlah: \"Dialah Allah, Yang Maha Esa.\"", "QS. Al-Ikhlas: 1", "112001"},
             {"اللَّهُ الصَّمَدُ",
-                    "Allah adalah Tuhan yang bergantung kepada-Nya segala sesuatu.", "QS. Al-Ikhlas: 2"},
+                    "Allah adalah Tuhan yang bergantung kepada-Nya segala sesuatu.", "QS. Al-Ikhlas: 2", "112002"},
             {"لَمْ يَلِدْ وَلَمْ يُولَدْ",
-                    "Dia tiada beranak dan tidak pula diperanakkan.", "QS. Al-Ikhlas: 3"},
+                    "Dia tiada beranak dan tidak pula diperanakkan.", "QS. Al-Ikhlas: 3", "112003"},
             {"فَبِأَيِّ آلَاءِ رَبِّكُمَا تُكَذِّبَانِ",
-                    "Maka nikmat Tuhan kamu yang manakah yang kamu dustakan?", "QS. Ar-Rahman: 13"},
+                    "Maka nikmat Tuhan kamu yang manakah yang kamu dustakan?", "QS. Ar-Rahman: 13", "055013"},
             {"وَلَلْآخِرَةُ خَيْرٌ لَكَ مِنَ الْأُولَىٰ",
-                    "Dan sesungguhnya hari kemudian itu lebih baik bagimu daripada yang sekarang (permulaan).", "QS. Ad-Duha: 4"},
+                    "Dan sesungguhnya hari kemudian itu lebih baik bagimu daripada yang sekarang (permulaan).", "QS. Ad-Duha: 4", "093004"},
             {"وَلَسَوْفَ يُعْطِيكَ رَبُّكَ فَتَرْضَىٰ",
-                    "Dan kelak Tuhanmu pasti memberikan karunia-Nya kepadamu, lalu (hati) kamu menjadi puas.", "QS. Ad-Duha: 5"},
+                    "Dan kelak Tuhanmu pasti memberikan karunia-Nya kepadamu, lalu (hati) kamu menjadi puas.", "QS. Ad-Duha: 5", "093005"},
             {"وَأَمَّا بِنِعْمَةِ رَبِّكَ فَحَدِّثْ",
-                    "Dan terhadap nikmat Tuhanmu, maka hendaklah kamu siarkan.", "QS. Ad-Duha: 11"},
+                    "Dan terhadap nikmat Tuhanmu, maka hendaklah kamu siarkan.", "QS. Ad-Duha: 11", "093011"},
             {"الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ",
-                    "Segala puji bagi Allah, Tuhan semesta alam.", "QS. Al-Fatihah: 2"},
+                    "Segala puji bagi Allah, Tuhan semesta alam.", "QS. Al-Fatihah: 2", "001002"},
             {"إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ",
-                    "Hanya Engkaulah yang kami sembah, dan hanya kepada Engkaulah kami meminta pertolongan.", "QS. Al-Fatihah: 5"},
+                    "Hanya Engkaulah yang kami sembah, dan hanya kepada Engkaulah kami meminta pertolongan.", "QS. Al-Fatihah: 5", "001005"},
             {"اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ",
-                    "Tunjukilah kami jalan yang lurus.", "QS. Al-Fatihah: 6"},
+                    "Tunjukilah kami jalan yang lurus.", "QS. Al-Fatihah: 6", "001006"},
             {"إِنَّا أَعْطَيْنَاكَ الْكَوْثَرَ",
-                    "Sesungguhnya Kami telah memberikan kepadamu nikmat yang banyak.", "QS. Al-Kausar: 1"},
+                    "Sesungguhnya Kami telah memberikan kepadamu nikmat yang banyak.", "QS. Al-Kausar: 1", "108001"},
             {"سَبِّحِ اسْمَ رَبِّكَ الْأَعْلَى",
-                    "Sucikanlah nama Tuhanmu Yang Maha Tinggi.", "QS. Al-A'la: 1"},
+                    "Sucikanlah nama Tuhanmu Yang Maha Tinggi.", "QS. Al-A'la: 1", "087001"},
             {"قَدْ أَفْلَحَ مَنْ تَزَكَّىٰ",
-                    "Sesungguhnya beruntunglah orang yang membersihkan diri (dengan beriman).", "QS. Al-A'la: 14"},
+                    "Sesungguhnya beruntunglah orang yang membersihkan diri (dengan beriman).", "QS. Al-A'la: 14", "087014"},
             {"وَالْآخِرَةُ خَيْرٌ وَأَبْقَىٰ",
-                    "Sedang kehidupan akhirat adalah lebih baik dan lebih kekal.", "QS. Al-A'la: 17"},
+                    "Sedang kehidupan akhirat adalah lebih baik dan lebih kekal.", "QS. Al-A'la: 17", "087017"},
             {"اقْرَأْ بِاسْمِ رَبِّكَ الَّذِي خَلَقَ",
-                    "Bacalah dengan (menyebut) nama Tuhanmu Yang menciptakan.", "QS. Al-'Alaq: 1"},
+                    "Bacalah dengan (menyebut) nama Tuhanmu Yang menciptakan.", "QS. Al-'Alaq: 1", "096001"},
             {"عَلَّمَ الْإِنْسَانَ مَا لَمْ يَعْلَمْ",
-                    "Dia mengajar kepada manusia apa yang tidak diketahuinya.", "QS. Al-'Alaq: 5"},
+                    "Dia mengajar kepada manusia apa yang tidak diketahuinya.", "QS. Al-'Alaq: 5", "096005"},
             {"فَمَنْ يَعْمَلْ مِثْقَالَ ذَرَّةٍ خَيْرًا يَرَهُ",
-                    "Barangsiapa yang mengerjakan kebaikan seberat dzarrahpun, niscaya dia akan melihat (balasan)nya.", "QS. Az-Zalzalah: 7"},
+                    "Barangsiapa yang mengerjakan kebaikan seberat dzarrahpun, niscaya dia akan melihat (balasan)nya.", "QS. Az-Zalzalah: 7", "099007"},
             {"وَمَنْ يَعْمَلْ مِثْقَالَ ذَرَّةٍ شَرًّا يَرَهُ",
-                    "Dan barangsiapa yang mengerjakan kejahatan sebesar dzarrahpun, niscaya dia akan melihat (balasan)nya pula.", "QS. Az-Zalzalah: 8"},
+                    "Dan barangsiapa yang mengerjakan kejahatan sebesar dzarrahpun, niscaya dia akan melihat (balasan)nya pula.", "QS. Az-Zalzalah: 8", "099008"},
             {"يَا أَيُّهَا الَّذِينَ آمَنُوا اذْكُرُوا اللَّهَ ذِكْرًا كَثِيرًا",
-                    "Hai orang-orang yang beriman, berzikirlah (dengan menyebut nama) Allah, zikir yang sebanyak-banyaknya.", "QS. Al-Ahzab: 41"},
+                    "Hai orang-orang yang beriman, berzikirlah (dengan menyebut nama) Allah, zikir yang sebanyak-banyaknya.", "QS. Al-Ahzab: 41", "033041"},
             {"وَسَبِّحُوهُ بُكْرَةً وَأَصِيلًا",
-                    "Dan bertasbihlah kepada-Nya diwaktu pagi dan petang.", "QS. Al-Ahzab: 42"},
+                    "Dan bertasbihlah kepada-Nya diwaktu pagi dan petang.", "QS. Al-Ahzab: 42", "033042"},
             {"وَمَا خَلَقْتُ الْجِنَّ وَالْإِنْسَ إِلَّا لِيَعْبُدُونِ",
-                    "Dan aku tidak menciptakan jin dan manusia melainkan supaya mereka mengabdi kepada-Ku.", "QS. Az-Zariyat: 56"},
+                    "Dan aku tidak menciptakan jin dan manusia melainkan supaya mereka mengabdi kepada-Ku.", "QS. Az-Zariyat: 56", "051056"},
             {"فَاصْبِرْ صَبْرًا جَمِيلًا",
-                    "Maka bersabarlah kamu dengan sabar yang baik.", "QS. Al-Ma'arij: 5"},
+                    "Maka bersabarlah kamu dengan sabar yang baik.", "QS. Al-Ma'arij: 5", "070005"},
             {"وَلِرَبِّكَ فَاصْبِرْ",
-                    "Dan untuk (memenuhi perintah) Tuhanmu, bersabarlah.", "QS. Al-Muddassir: 7"},
+                    "Dan untuk (memenuhi perintah) Tuhanmu, bersabarlah.", "QS. Al-Muddassir: 7", "074007"},
             {"يَا أَيَّتُهَا النَّفْسُ الْمُطْمَئِنَّةُ",
-                    "Hai jiwa yang tenang.", "QS. Al-Fajr: 27"},
+                    "Hai jiwa yang tenang.", "QS. Al-Fajr: 27", "089027"},
             {"ارْجِعِي إِلَىٰ رَبِّكِ رَاضِيَةً مَرْضِيَّةً",
-                    "Kembalilah kepada Tuhanmu dengan hati yang puas lagi diridhai-Nya.", "QS. Al-Fajr: 28"},
+                    "Kembalilah kepada Tuhanmu dengan hati yang puas lagi diridhai-Nya.", "QS. Al-Fajr: 28", "089028"},
             {"قَدْ أَفْلَحَ الْمُؤْمِنُونَ",
-                    "Sesungguhnya beruntunglah orang-orang yang beriman.", "QS. Al-Mu'minun: 1"},
+                    "Sesungguhnya beruntunglah orang-orang yang beriman.", "QS. Al-Mu'minun: 1", "023001"},
             {"وَاذْكُرِ اسْمَ رَبِّكَ وَتَبَتَّلْ إِلَيْهِ تَبْتِيلًا",
-                    "Sebutlah nama Tuhanmu, dan beribadatlah kepada-Nya dengan penuh ketekunan.", "QS. Al-Muzzammil: 8"},
+                    "Sebutlah nama Tuhanmu, dan beribadatlah kepada-Nya dengan penuh ketekunan.", "QS. Al-Muzzammil: 8", "073008"},
     };
 
     /** Today's verse: one per day, cycling through the list. */
     static String[] verse(LocalDate today) {
-        return VERSES[(int) Math.floorMod(today.toEpochDay(), (long) VERSES.length)];
+        return VERSES[verseIndex(today)];
+    }
+
+    static int verseIndex(LocalDate today) {
+        return (int) Math.floorMod(today.toEpochDay(), (long) VERSES.length);
+    }
+
+    /** Mishary Alafasy's recitation of the verse, from everyayah.com (about 100 KB). */
+    static String audioUrl(String[] verse) {
+        return "https://everyayah.com/data/Alafasy_128kbps/" + verse[3] + ".mp3";
+    }
+
+    // ---- the calendar window ----------------------------------------------------------------------------
+
+    /** The Islamic holiday on this day, or null. */
+    static String holiday(LocalDate date, int adjustDays) {
+        int[] h = hijri(date, adjustDays);
+        if (h == null) return null;
+        for (int k = 0; k < ISLAMIC_DAYS.length; k++) {
+            if (ISLAMIC_DAYS[k][0] == h[1] && ISLAMIC_DAYS[k][1] == h[0]) return ISLAMIC_NAMES[k];
+        }
+        return null;
+    }
+
+    static boolean mondayThursday(LocalDate date, int adjustDays) {
+        DayOfWeek w = date.getDayOfWeek();
+        return (w == DayOfWeek.MONDAY || w == DayOfWeek.THURSDAY) && !noSunnahFast(date, adjustDays);
+    }
+
+    static boolean ayyamulBidh(LocalDate date, int adjustDays) {
+        int[] h = hijri(date, adjustDays);
+        return h != null && h[0] >= 13 && h[0] <= 15 && !noSunnahFast(date, adjustDays);
+    }
+
+    /** A day cell's marks: "●" Monday/Thursday fast, "◆" Ayyamul Bidh, "■" Islamic holiday, in that order. */
+    static String marks(LocalDate date, int adjustDays) {
+        return (mondayThursday(date, adjustDays) ? "●" : "") + (ayyamulBidh(date, adjustDays) ? "◆" : "")
+                + (holiday(date, adjustDays) != null ? "■" : "");
     }
 }

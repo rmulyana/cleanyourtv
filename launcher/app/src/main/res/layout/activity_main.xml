@@ -405,7 +405,7 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
-            <!-- In place of the two football panels when "islamic" is on: fasts and holidays, then today's verse. -->
+            <!-- In place of the two football panels when "islamic" is on: fasts and Islamic holidays, then today's verse. -->
             <LinearLayout
                 android:id="@+id/calendarPanel"
                 style="@style/SchedulePanel"
@@ -431,6 +431,17 @@
                     style="@style/ScheduleTitle"
                     android:text="Ayat hari ini" />
 
+                <!-- Not Fira Code: Android's Arabic font draws the harakat. -->
+                <TextView
+                    android:id="@+id/verseArabic"
+                    style="@style/ScheduleText"
+                    android:layout_marginBottom="6dp"
+                    android:fontFamily="sans-serif"
+                    android:gravity="start"
+                    android:maxLines="2"
+                    android:textDirection="rtl"
+                    android:textSize="18sp" />
+
                 <TextView
                     android:id="@+id/verseText"
                     style="@style/ScheduleText"
@@ -446,12 +457,6 @@
                     android:textColor="#8CFFFFFF"
                     android:textSize="11sp" />
 
-                <TextView
-                    android:id="@+id/asmaText"
-                    style="@style/ScheduleText"
-                    android:layout_marginTop="6dp"
-                    android:lineSpacingExtra="3dp"
-                    android:maxLines="2" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

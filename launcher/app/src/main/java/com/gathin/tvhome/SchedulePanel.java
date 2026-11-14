@@ -79,7 +79,7 @@ final class SchedulePanel {
     private final TextView systemStats;
     /** config "islamic": the calendar and verse panels ({@link IslamicDay}) replace the two football panels. */
     private final boolean islamicOn;
-    private final TextView calendarText, verseText, verseRef, asmaText;
+    private final TextView calendarText, verseArabic, verseText, verseRef;
     private final long[] teams;
     private final JSONArray standingsCfg;
     /** config "short_names": {"Manchester United": "Man Utd"}, applied to both sides of a match. */
@@ -186,9 +186,9 @@ final class SchedulePanel {
         }
         islamicOn = cfg.optBoolean("islamic", false);
         calendarText = root.findViewById(R.id.calendarText);
+        verseArabic = root.findViewById(R.id.verseArabic);
         verseText = root.findViewById(R.id.verseText);
         verseRef = root.findViewById(R.id.verseRef);
-        asmaText = root.findViewById(R.id.asmaText);
         if (islamicOn) {
             footballPanel.setVisibility(View.GONE);
             standingsPanel.setVisibility(View.GONE);
@@ -476,12 +476,17 @@ final class SchedulePanel {
         LocalDate fast = IslamicDay.nextMondayThursday(today, hijriAdjust);
         calendarText.setText("Puasa Senin/Kamis · " + (fast == null ? "—" : IslamicDay.when(fast, today))
                 + "\nAyyamul Bidh · " + IslamicDay.rangeLine(IslamicDay.nextAyyamulBidh(today, hijriAdjust), today)
-                + "\n" + IslamicDay.holidayLine(IslamicDay.nextIslamicHoliday(today, hijriAdjust), today)
-                + "\n" + IslamicDay.holidayLine(IslamicDay.nextNationalHoliday(today), today));
+                + holidayLines(IslamicDay.nextIslamicHolidays(today, hijriAdjust, 2), today));
         String[] v = IslamicDay.verse(today);
-        verseText.setText("\u201C" + v[0] + "\u201D");
-        verseRef.setText(v[1]);
-        asmaText.setText("Asmaul Husna · " + IslamicDay.asma(today));
+        verseArabic.setText(v[0]);
+        verseText.setText("\u201C" + v[1] + "\u201D");
+        verseRef.setText(v[2]);
+    }
+
+    private static String holidayLines(List<IslamicDay.Holiday> holidays, LocalDate today) {
+        StringBuilder sb = new StringBuilder();
+        for (IslamicDay.Holiday h : holidays) sb.append('\n').append(IslamicDay.holidayLine(h, today));
+        return sb.toString();
     }
 
     /**

@@ -38,21 +38,25 @@ public class IslamicDayTest {
 
     @Test
     public void holidays() {
-        IslamicDay.Holiday isra = IslamicDay.nextIslamicHoliday(g(1448, 6, 3), -1);
-        assertEquals("Isra Mi'raj", isra.name);
-        assertEquals(g(1448, 7, 27), isra.date);
-        LocalDate aug17 = LocalDate.of(2027, 8, 17);
-        assertEquals("Hari Kemerdekaan · hari ini", IslamicDay.holidayLine(IslamicDay.nextNationalHoliday(aug17), aug17));
-        assertEquals("Natal · Jum, 25 Des · 41 hari lagi",
-                IslamicDay.holidayLine(IslamicDay.nextNationalHoliday(LocalDate.of(2026, 11, 14)), LocalDate.of(2026, 11, 14)));
+        java.util.List<IslamicDay.Holiday> next = IslamicDay.nextIslamicHolidays(g(1448, 6, 3), -1, 2);
+        assertEquals(2, next.size());
+        assertEquals("Isra Mi'raj", next.get(0).name);
+        assertEquals(g(1448, 7, 27), next.get(0).date);
+        assertEquals("Awal Ramadan", next.get(1).name);
+        LocalDate fitri = g(1448, 10, 1);
+        assertEquals("Idul Fitri · hari ini", IslamicDay.holidayLine(IslamicDay.nextIslamicHolidays(fitri, -1, 1).get(0), fitri));
+        assertEquals("Idul Fitri · besok",
+                IslamicDay.holidayLine(IslamicDay.nextIslamicHolidays(fitri.minusDays(1), -1, 1).get(0), fitri.minusDays(1)));
     }
 
     @Test
     public void dailyTexts() {
-        assertEquals(99, IslamicDay.ASMA.length);
-        assertEquals(IslamicDay.ASMA.length, new java.util.HashSet<>(java.util.Arrays.asList(IslamicDay.ASMA)).size());
         LocalDate d = LocalDate.of(2026, 11, 14);
         assertTrue(IslamicDay.verse(d) != IslamicDay.verse(d.plusDays(1)));
-        for (String[] v : IslamicDay.VERSES) assertTrue(v[0], v[0].length() <= 110);
+        for (String[] v : IslamicDay.VERSES) {
+            assertEquals(3, v.length);
+            assertFalse(v[2], v[0].startsWith("\u0628\u0650\u0633\u0652\u0645\u0650"));   // no Basmalah prefix
+            assertTrue(v[2], v[1].length() <= 110);
+        }
     }
 }
